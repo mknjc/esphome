@@ -2,10 +2,23 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import climate, sensor, output
-from esphome.const import CONF_ID, CONF_SENSOR
+from esphome.const import (
+    CONF_ID,
+    CONF_MAX_TEMPERATURE,
+    CONF_MIN_TEMPERATURE,
+    CONF_MODE,
+    CONF_NAME,
+    CONF_PRESET,
+    CONF_SENSOR,
+    CONF_VISUAL,
+)
+
+CONF_PRESET_CHANGE = "preset_change"
+CONF_DEFAULT_PRESET = "default_preset"
 
 pid_ns = cg.esphome_ns.namespace("pid")
 PIDClimate = pid_ns.class_("PIDClimate", climate.Climate, cg.Component)
+PIDClimateTargetTempConfig = pid_ns.struct("PIDClimateTargetTempConfig")
 PIDAutotuneAction = pid_ns.class_("PIDAutotuneAction", automation.Action)
 PIDResetIntegralTermAction = pid_ns.class_(
     "PIDResetIntegralTermAction", automation.Action
@@ -40,6 +53,82 @@ CONF_KP_MULTIPLIER = "kp_multiplier"
 CONF_KI_MULTIPLIER = "ki_multiplier"
 CONF_KD_MULTIPLIER = "kd_multiplier"
 
+PRESET_CONFIG_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(): cv.declare_id(PIDClimateTargetTempConfig),
+        cv.Required(CONF_NAME): cv.string_strict,
+        cv.Optional(CONF_MODE): climate.validate_climate_mode,
+        cv.Optional(CONF_DEFAULT_TARGET_TEMPERATURE): cv.temperature,
+    }
+)
+
+def validate_pid_climate(config):
+    # Verify that the modes for presets are valid given the configuration
+    if CONF_PRESET in config:
+        # Preset temperature vs Visual temperature validation
+
+        # Default visual configuration from climate_traits.h
+        visual_min_temperature = 10.0
+        visual_max_temperature = 30.0
+        if CONF_VISUAL in config:
+            visual_config = config[CONF_VISUAL]
+
+            if CONF_MIN_TEMPERATURE in visual_config:
+                visual_min_temperature = visual_config[CONF_MIN_TEMPERATURE]
+
+            if CONF_MAX_TEMPERATURE in visual_config:
+                visual_max_temperature = visual_config[CONF_MAX_TEMPERATURE]
+
+        for preset_config in config[CONF_PRESET]:
+            if CONF_DEFAULT_TARGET_TEMPERATURE in preset_config:
+                preset_temperature = preset_config[
+                    CONF_DEFAULT_TARGET_TEMPERATURE
+                ]
+                if preset_temperature < visual_min_temperature:
+                    raise cv.Invalid(
+                        f"{CONF_DEFAULT_TARGET_TEMPERATURE} for {preset_config[CONF_NAME]} is set to {preset_temperature} which is less than the visual minimum temperature of {visual_min_temperature}"
+                    )
+                if preset_temperature > visual_max_temperature:
+                    raise cv.Invalid(
+                        f"{CONF_DEFAULT_TARGET_TEMPERATURE} for {preset_config[CONF_NAME]} is set to {preset_temperature} which is more than the visual maximum temperature of {visual_max_temperature}"
+                    )
+
+        # Mode validation
+        for preset_config in config[CONF_PRESET]:
+            if CONF_MODE not in preset_config:
+                continue
+
+            mode = preset_config[CONF_MODE]
+
+ #           for req in requirements[mode]:
+ #               if req not in config:
+ #                   raise cv.Invalid(
+ #                       f"{CONF_MODE} is set to {mode} for {preset_config[CONF_NAME]} but {req} is not present in the configuration"
+ #                   )
+
+    if CONF_DEFAULT_PRESET in config:
+        default_preset = config[CONF_DEFAULT_PRESET]
+
+        if CONF_PRESET not in config:
+            raise cv.Invalid(
+                f"{CONF_DEFAULT_PRESET} is specified but no presets are defined"
+            )
+
+        presets = config[CONF_PRESET]
+        found_preset = False
+
+        for preset in presets:
+            if preset[CONF_NAME] == default_preset:
+                found_preset = True
+                break
+
+        if found_preset is False:
+            raise cv.Invalid(
+                f"{CONF_DEFAULT_PRESET} set to '{default_preset}' but no such preset has been defined. Available presets: {[preset[CONF_NAME] for preset in presets]}"
+            )
+    return config
+
+
 CONFIG_SCHEMA = cv.All(
     climate.CLIMATE_SCHEMA.extend(
         {
@@ -72,9 +161,15 @@ CONFIG_SCHEMA = cv.All(
                     cv.Optional(CONF_OUTPUT_AVERAGING_SAMPLES, default=1): cv.int_,
                 }
             ),
+            cv.Optional(CONF_DEFAULT_PRESET): cv.templatable(cv.string),
+            cv.Optional(CONF_PRESET): cv.ensure_list(PRESET_CONFIG_SCHEMA),
+            cv.Optional(CONF_PRESET_CHANGE): automation.validate_automation(
+                single=True
+            )
         }
     ),
     cv.has_at_least_one_key(CONF_COOL_OUTPUT, CONF_HEAT_OUTPUT),
+    validate_pid_climate,
 )
 
 
@@ -120,6 +215,44 @@ async def to_code(config):
         )
 
     cg.add(var.set_default_target_temperature(config[CONF_DEFAULT_TARGET_TEMPERATURE]))
+
+    if CONF_PRESET in config:
+        for preset_config in config[CONF_PRESET]:
+            name = preset_config[CONF_NAME]
+            standard_preset = None
+            if name.upper() in climate.CLIMATE_PRESETS:
+                standard_preset = climate.CLIMATE_PRESETS[name.upper()]
+            preset_target_config = PIDClimateTargetTempConfig(
+                preset_config[CONF_DEFAULT_TARGET_TEMPERATURE]
+            )
+
+            preset_target_variable = cg.new_variable(
+                preset_config[CONF_ID], preset_target_config
+            )
+
+            if CONF_MODE in preset_config:
+                cg.add(preset_target_variable.set_mode(preset_config[CONF_MODE]))
+
+            if standard_preset is not None:
+                cg.add(var.set_preset_config(standard_preset, preset_target_variable))
+            else:
+                cg.add(var.set_custom_preset_config(name, preset_target_variable))
+
+    if CONF_DEFAULT_PRESET in config:
+        default_preset_name = config[CONF_DEFAULT_PRESET]
+
+        # if the name is a built in preset use the appropriate naming format
+        if default_preset_name.upper() in climate.CLIMATE_PRESETS:
+            climate_preset = climate.CLIMATE_PRESETS[default_preset_name.upper()]
+            cg.add(var.set_default_preset(climate_preset))
+        else:
+            cg.add(var.set_default_preset(default_preset_name))
+
+    if CONF_PRESET_CHANGE in config:
+        await automation.build_automation(
+            var.get_preset_change_trigger(), [], config[CONF_PRESET_CHANGE]
+        )
+
 
 
 @automation.register_action(

@@ -6,6 +6,12 @@ namespace pid {
 
 static const char *const TAG = "pid.climate";
 
+PIDClimateTargetTempConfig::PIDClimateTargetTempConfig() = default;
+PIDClimateTargetTempConfig::PIDClimateTargetTempConfig(float default_temperature)
+    : default_temperature(default_temperature){};
+
+PIDClimate::PIDClimate() : preset_change_trigger_(new Trigger<>()) {}
+
 void PIDClimate::setup() {
   this->sensor_->add_on_state_callback([this](float state) {
     // only publish if state/current temperature has changed in two digits of precision
@@ -28,9 +34,22 @@ void PIDClimate::setup() {
       this->mode = climate::CLIMATE_MODE_HEAT;
     }
     this->target_temperature = this->default_target_temperature_;
+
+    if (this->default_preset_ != climate::ClimatePreset::CLIMATE_PRESET_NONE) {
+      this->change_preset_(this->default_preset_);
+    } else if (!this->default_custom_preset_.empty()) {
+      this->change_custom_preset_(this->default_custom_preset_);
+    }
   }
 }
 void PIDClimate::control(const climate::ClimateCall &call) {
+  if (call.get_preset().has_value()) {
+    this->change_preset_(*call.get_preset());
+  }
+  if (call.get_custom_preset().has_value()) {
+    this->change_custom_preset_(*call.get_custom_preset());
+  }
+
   if (call.get_mode().has_value())
     this->mode = *call.get_mode();
   if (call.get_target_temperature().has_value())
@@ -55,8 +74,26 @@ climate::ClimateTraits PIDClimate::traits() {
   if (supports_heat_() && supports_cool_())
     traits.add_supported_mode(climate::CLIMATE_MODE_HEAT_COOL);
 
+  for (auto &it : this->preset_config_) {
+    traits.add_supported_preset(it.first);
+  }
+  for (auto &it : this->custom_preset_config_) {
+    traits.add_supported_custom_preset(it.first);
+  }
+
   traits.set_supports_action(true);
   return traits;
+}
+
+void PIDClimate::dump_preset_config_(const char *preset_name, const PIDClimateTargetTempConfig &config,
+                                     bool is_default_preset) {
+  ESP_LOGCONFIG(TAG, "      %s Is Default: %s", preset_name, YESNO(is_default_preset));
+  ESP_LOGCONFIG(TAG, "      %s Default Target Temperature: %.1f°C", preset_name, config.default_temperature);
+
+  if (config.mode_.has_value()) {
+    ESP_LOGCONFIG(TAG, "      %s Default Mode: %s", preset_name,
+                  LOG_STR_ARG(climate::climate_mode_to_string(*config.mode_)));
+  }
 }
 void PIDClimate::dump_config() {
   LOG_CLIMATE("", "PID Climate", this);
@@ -73,10 +110,97 @@ void PIDClimate::dump_config() {
                   controller_.ki_multiplier_, controller_.kd_multiplier_, controller_.deadband_output_samples_);
   }
 
+  ESP_LOGCONFIG(TAG, "  Supported PRESETS: ");
+  for (auto &it : this->preset_config_) {
+    const auto *preset_name = LOG_STR_ARG(climate::climate_preset_to_string(it.first));
+
+    ESP_LOGCONFIG(TAG, "    Supports %s: %s", preset_name, YESNO(true));
+    this->dump_preset_config_(preset_name, it.second, it.first == this->default_preset_);
+  }
+
+  ESP_LOGCONFIG(TAG, "  Supported CUSTOM PRESETS: ");
+  for (auto &it : this->custom_preset_config_) {
+    const auto *preset_name = it.first.c_str();
+
+    ESP_LOGCONFIG(TAG, "    Supports %s: %s", preset_name, YESNO(true));
+    this->dump_preset_config_(preset_name, it.second, it.first == this->default_custom_preset_);
+  }
+
   if (this->autotuner_ != nullptr) {
     this->autotuner_->dump_config();
   }
 }
+
+void PIDClimate::change_preset_(climate::ClimatePreset preset) {
+  auto config = this->preset_config_.find(preset);
+
+  if (config != this->preset_config_.end()) {
+    ESP_LOGI(TAG, "Preset %s requested", LOG_STR_ARG(climate::climate_preset_to_string(preset)));
+    if (this->change_preset_internal_(config->second) || (!this->preset.has_value()) ||
+        this->preset.value() != preset) {
+      // Fire any preset changed trigger if defined
+      Trigger<> *trig = this->preset_change_trigger_;
+      assert(trig != nullptr);
+      trig->trigger();
+
+      ESP_LOGI(TAG, "Preset %s applied", LOG_STR_ARG(climate::climate_preset_to_string(preset)));
+    } else {
+      ESP_LOGI(TAG, "No changes required to apply preset %s", LOG_STR_ARG(climate::climate_preset_to_string(preset)));
+    }
+    this->custom_preset.reset();
+    this->preset = preset;
+  } else {
+    ESP_LOGE(TAG, "Preset %s is not configured, ignoring.", LOG_STR_ARG(climate::climate_preset_to_string(preset)));
+  }
+}
+
+void PIDClimate::change_custom_preset_(const std::string &custom_preset) {
+  auto config = this->custom_preset_config_.find(custom_preset);
+
+  if (config != this->custom_preset_config_.end()) {
+    ESP_LOGI(TAG, "Custom preset %s requested", custom_preset.c_str());
+    if (this->change_preset_internal_(config->second) || (!this->custom_preset.has_value()) ||
+        this->custom_preset.value() != custom_preset) {
+      // Fire any preset changed trigger if defined
+      Trigger<> *trig = this->preset_change_trigger_;
+      assert(trig != nullptr);
+      trig->trigger();
+
+      ESP_LOGI(TAG, "Custom preset %s applied", custom_preset.c_str());
+    } else {
+      ESP_LOGI(TAG, "No changes required to apply custom preset %s", custom_preset.c_str());
+    }
+    this->preset.reset();
+    this->custom_preset = custom_preset;
+  } else {
+    ESP_LOGE(TAG, "Custom Preset %s is not configured, ignoring.", custom_preset.c_str());
+  }
+}
+
+bool PIDClimate::change_preset_internal_(const PIDClimateTargetTempConfig &config) {
+  bool something_changed = false;
+
+  if (this->target_temperature != config.default_temperature) {
+    this->target_temperature = config.default_temperature;
+    something_changed = true;
+  }
+
+  // Note: The mode can be defined in the preset but if the climate.control call also specifies them then
+  // the climate.control call's values will override the preset's values for that call
+  if (config.mode_.has_value() && (this->mode != config.mode_.value())) {
+    ESP_LOGV(TAG, "Setting mode to %s", LOG_STR_ARG(climate::climate_mode_to_string(*config.mode_)));
+    this->mode = *config.mode_;
+    something_changed = true;
+  }
+
+  // If switching to off mode, set output immediately
+  if (this->mode == climate::CLIMATE_MODE_OFF)
+    this->write_output_(0.0f);
+
+  this->publish_state();
+  return something_changed;
+}
+
 void PIDClimate::write_output_(float value) {
   this->output_value_ = value;
 
