@@ -189,6 +189,22 @@ void Modbus::send(uint8_t address, uint8_t function_code, uint16_t start_address
   if (this->flow_control_pin_ != nullptr)
     this->flow_control_pin_->digital_write(true);
 
+  this->flush();
+  delay(10);
+  auto unreadLength = this->available();
+  if (unreadLength > 0) {
+    ESP_LOGW(TAG, "Flushing %u bytes of unread data in uart buffer", unreadLength);
+    while (this->available()) {
+      uint8_t byte;
+      this->read_byte(&byte);
+    }
+  }
+
+  if (!this->rx_buffer_.empty()) {
+    ESP_LOGW(TAG, "Flushing %u bytes of unread data in modbus buffer", this->rx_buffer_.size());
+    this->rx_buffer_.clear();
+  }
+
   this->write_array(data);
   this->flush();
 
