@@ -15,9 +15,11 @@ void Modbus::setup() {
 void Modbus::loop() {
   const uint32_t now = millis();
 
-  if (now - this->last_modbus_byte_ > 50) {
+  if (now - this->last_modbus_byte_ > 500 && !this->rx_buffer_.empty()) {
     this->rx_buffer_.clear();
     this->last_modbus_byte_ = now;
+
+    ESP_LOGW(TAG, "Dropping %u bytes of unread data in modbus buffer after timeout", this->rx_buffer_.size());
   }
   // stop blocking new send commands after send_wait_time_ ms regardless if a response has been received since then
   if (now - this->last_send_ > send_wait_time_) {
@@ -30,6 +32,7 @@ void Modbus::loop() {
     if (this->parse_modbus_byte_(byte)) {
       this->last_modbus_byte_ = now;
     } else {
+      ESP_LOGW(TAG, "Dropping %u bytes of data in modbus buffer after error", this->rx_buffer_.size());
       this->rx_buffer_.clear();
     }
   }
@@ -191,6 +194,7 @@ void Modbus::send(uint8_t address, uint8_t function_code, uint16_t start_address
 
   this->flush();
   delay(10);
+  this->loop();
   auto unreadLength = this->available();
   if (unreadLength > 0) {
     ESP_LOGW(TAG, "Flushing %u bytes of unread data in uart buffer", unreadLength);
