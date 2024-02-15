@@ -46,7 +46,7 @@ CONFIG_SCHEMA = cv.All(
         }
     )
     .extend(i2c.i2c_device_schema(0x40))
-    .extend(cv.COMPONENT_SCHEMA),
+    .extend(cv.polling_component_schema("10s")),
     cv.has_none_or_all_keys(CONF_FAN_OUTPUT, CONF_FAN_SHUNT_RESISTANCE)
 )
 
