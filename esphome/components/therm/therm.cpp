@@ -350,6 +350,11 @@ void ThermComponent::update() {
 void ThermComponent::dump_config() {}
 
 void ThermOutput::write_state(float state) {
+  if (this->parent_ == nullptr) {
+    ESP_LOGE(TAG, "Parent not set");
+    return;
+  }
+
   if (this->type_ == OutputType::VALVE) {
     this->parent_->set_valve_value(state);
   } else {
