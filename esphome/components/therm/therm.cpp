@@ -225,6 +225,7 @@ void ThermComponent::update_valve() {
 void ThermComponent::update_fan() {}
 
 void ThermComponent::start_valve_current_measurement() {
+  ESP_LOGD(TAG, "Starting valve current measurement");
   this->state_ = State::VALVE_CURRENT_MEASUREMENT_WAIT;
   this->valve_output_->digital_write(true);
 
@@ -240,6 +241,7 @@ void ThermComponent::start_valve_current_measurement() {
 }
 
 void ThermComponent::start_other_measurements() {
+  ESP_LOGD(TAG, "Starting other measurements");
   this->state_ = State::OTHER_MEASUREMENTS_WAIT;
 
   auto [config, duration] =
@@ -276,7 +278,7 @@ void ThermComponent::measurement_callback(uint8_t retry_count) {
     return;
   }
 
-  if (mask & 0x1) {
+  if ((mask & 0x1) == 0) {
     if (retry_count < 10) {
       ESP_LOGI(TAG, "Measurement not finished");
       set_timeout(100, std::bind(&ThermComponent::measurement_callback, this, retry_count + 1));
@@ -287,7 +289,7 @@ void ThermComponent::measurement_callback(uint8_t retry_count) {
       return;
     }
   }
-
+  ESP_LOGD(TAG, "Measurement finished State: %d", static_cast<uint8_t>(state_));
   switch (state_) {
     case State::VALVE_CURRENT_MEASUREMENT_WAIT:
       state_ = State::VALVE_CURRENT_MEASUREMENT_COMPLETED;
