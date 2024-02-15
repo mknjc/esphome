@@ -67,9 +67,7 @@ CONFIG_SCHEMA = (
 
 
 async def to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID])
-    await cg.register_component(var, config)
-    await i2c.register_i2c_device(var, config)
+    paren = await cg.get_variable(config[CONF_THERM_ID])
 
     for i, channel in enumerate([CONF_VALVE, CONF_FAN, CONF_CONTINUOUS]):
         if channel not in config:
@@ -77,13 +75,13 @@ async def to_code(config):
         conf = config[channel]
         if CONF_BUS_VOLTAGE in conf:
             sens = await sensor.new_sensor(conf[CONF_BUS_VOLTAGE])
-            cg.add(var.set_bus_voltage_sensor(i, sens))
+            cg.add(paren.set_bus_voltage_sensor(i, sens))
         if CONF_SHUNT_VOLTAGE in conf:
             sens = await sensor.new_sensor(conf[CONF_SHUNT_VOLTAGE])
-            cg.add(var.set_shunt_voltage_sensor(i, sens))
+            cg.add(paren.set_shunt_voltage_sensor(i, sens))
         if CONF_CURRENT in conf:
             sens = await sensor.new_sensor(conf[CONF_CURRENT])
-            cg.add(var.set_current_sensor(i, sens))
+            cg.add(paren.set_current_sensor(i, sens))
         if CONF_POWER in conf:
             sens = await sensor.new_sensor(conf[CONF_POWER])
-            cg.add(var.set_power_sensor(i, sens))
+            cg.add(paren.set_power_sensor(i, sens))
