@@ -65,6 +65,13 @@ class ThermOutput : public output::FloatOutput, Parented<ThermComponent> {
   OutputType type_;
 };
 
+enum class State {
+  VALVE_CURRENT_MEASUREMENT_WAIT,
+  VALVE_CURRENT_MEASUREMENT_COMPLETED,
+  OTHER_MEASUREMENTS_WAIT,
+  OTHER_MEASUREMENTS_COMPLETED,
+}
+
 class ThermComponent : public i2c::I2CDevice, public PollingComponent {
  friend class ThermOutput;
  public:
@@ -73,7 +80,7 @@ class ThermComponent : public i2c::I2CDevice, public PollingComponent {
   /// HARDWARE setup priority
   float get_setup_priority() const override { return setup_priority::PROCESSOR; }
 
-  void set_heater_output(GPIOPin *heater_output) { this->heater_output_ = heater_output; }
+  void set_valve_output(GPIOPin *valve_output) { this->valve_output_ = valve_output; }
   void set_fan_output(ledc::LEDCOutput *fan_output) { this->fan_output_ = fan_output; }
   void set_r_output(GPIOPin *r_output) { this->r_output_ = r_output; }
   void set_g_output(GPIOPin *g_output) { this->g_output_ = g_output; }
@@ -88,12 +95,22 @@ class ThermComponent : public i2c::I2CDevice, public PollingComponent {
   void update() override;
 
   private:
-    void set_valve_value(float value);
-    void set_fan_value(float value);
+    void set_valve_value(float value) { this->valve_value_ = value; }
+    void set_fan_value(float value) { this->fan_value_ = value; }
 
     bool measure(MeasurementParameter param);
 
-    GPIOPin *heater_output_;
+    void update_valve();
+    void update_fan();
+
+    void start_valve_current_measurement();
+    void start_other_measurements();
+    void measurement_callback();
+
+    void read_bus_voltage(uint8_t ch);
+    void read_shunt(uint8_t ch);
+
+    GPIOPin *valve_output_;
     ledc::LEDCOutput *fan_output_;
     GPIOPin *r_output_;
     GPIOPin *g_output_;
@@ -105,6 +122,15 @@ class ThermComponent : public i2c::I2CDevice, public PollingComponent {
     sensor::Sensor *current_sensor_[3] = {nullptr, nullptr, nullptr};
     sensor::Sensor *power_sensor_[3] = {nullptr, nullptr, nullptr};
 
+    State state_ = OTHER_MEASUREMENTS_COMPLETED;
+
+    float valve_value_ = 0.0;
+    float fan_value_ = 0.0;
+
+    float valve_accum_{0};
+    bool valve_state_{false};
+
+    uint32_t last_valve_measurement_{0};
 };
 
 

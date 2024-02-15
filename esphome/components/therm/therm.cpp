@@ -206,7 +206,130 @@ void ThermComponent::setup() {
            fan_voltage / 1000.0, continuous_voltage / 1000.0);
 }
 
-void ThermComponent::update() {}
+void ThermComponent::update_valve() {
+  this->valve_accum_ += this->valve_value_;
+  const bool next_state = this->valve_accum_ > 0;
+
+  if (next_state) {
+    this->valve_accum_ -= 1.;
+  }
+
+  if (next_state != this->valve_state_) {
+    this->valve_state_ = next_state;
+    if (this->valve_output_ && this->state_ != State::VALVE_CURRENT_MEASUREMENT_WAIT) {
+      this->valve_output_->digital_write(next_state);
+    }
+  }
+}
+
+void ThermComponent::update_fan() {
+}
+
+void ThermComponent::start_valve_current_measurement() {
+  this->state_ = State::VALVE_CURRENT_MEASUREMENT_WAIT;
+  this->valve_output_->digital_write(true);
+
+    auto [config, duration] = calculate_config(MeasurementParameter{
+        IntegrationTime::US8244,
+        Averaging::SAMPLE_1,
+        Channel::CHANNEL1_SHUNT
+        }, true);
+
+    if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
+      ESP_LOGE(TAG, "Error setting config");
+      this->mark_failed();
+      return;
+    }
+    set_timeout(duration, std::bind(&ThermComponent::measurement_callback, this));
+}
+
+void ThermComponent::start_other_measurements() {
+  this->state_ = State::OTHER_MEASUREMENTS_WAIT;
+
+    auto [config, duration] = calculate_config(MeasurementParameter{
+        IntegrationTime::US8244,
+        Averaging::SAMPLE_16,
+        Channel::CHANNEL1_BUS | Channel::CHANNEL2_BUS | Channel::CHANNEL3_BUS |
+        Channel::CHANNEL2_SHUNT | Channel::CHANNEL3_SHUNT
+        }, true);
+
+    if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
+      ESP_LOGE(TAG, "Error setting config");
+      this->mark_failed();
+      return;
+    }
+    set_timeout(duration, std::bind(&ThermComponent::measurement_callback, this));
+}
+
+void ThermComponent::read_bus_voltage(uint8_t ch) {
+  uint16_t bus_voltage;
+  if (!this->read_bytes_16(INA3221_REGISTER_CHANNEL1_BUS_VOLTAGE + ch * 2, &bus_voltage, 1)) {
+    ESP_LOGE(TAG, "Error reading bus voltage");
+    this->mark_failed();
+    return;
+  }
+  if (this->bus_voltage_sensor_[ch]) {
+    this->bus_voltage_sensor_[ch]->publish_state(bus_voltage / 1000.0);
+  }
+}
+
+void ThermComponent::measurement_callback() {
+  switch (state_)
+  {
+  case State::VALVE_CURRENT_MEASUREMENT_WAIT:
+    state_ = State::VALVE_CURRENT_MEASUREMENT_COMPLETED;
+    this->valve_output_->digital_write(this->valve_state_);
+    break;
+  case State::OTHER_MEASUREMENTS_WAIT:
+    state_ = State::OTHER_MEASUREMENTS_COMPLETED;
+    break;
+  }
+}
+
+void ThermComponent::read_shunt(uint8_t ch) {
+  uint16_t shunt_voltage;
+  if (!this->read_bytes_16(INA3221_REGISTER_CHANNEL1_SHUNT_VOLTAGE + ch * 2, &shunt_voltage, 1)) {
+    ESP_LOGE(TAG, "Error reading shunt voltage");
+    this->mark_failed();
+    return;
+  }
+  const float shunt_voltage_v = int16_t(shunt_voltage) * 40.0f / 8.0f / 1000000.0f;
+  if (this->shunt_voltage_sensor_[ch]) {
+    this->shunt_voltage_sensor_[ch]->publish_state(shunt_voltage_v);
+  }
+  if (this->current_sensor_[ch] && this->shunt_resistance_[ch] > 0.0f) {
+    this->current_sensor_[ch]->publish_state(shunt_voltage_v / this->shunt_resistance_[ch]);
+  }
+}
+
+void ThermComponent::update() {
+  update_valve();
+  update_fan();
+
+  switch (state_)
+  {
+  case State::VALVE_CURRENT_MEASUREMENT_WAIT:
+  case State::OTHER_MEASUREMENTS_WAIT:
+    return;
+  case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
+    read_shunt(0);
+    break;
+  case State::OTHER_MEASUREMENTS_COMPLETED:
+    read_bus_voltage(0);
+    read_bus_voltage(1);
+    read_bus_voltage(2);
+    read_shunt(1);
+    read_shunt(2);
+    break;
+  }
+
+  if (millis() - last_valve_measurement_ > 10000) {
+    last_valve_measurement_ = millis();
+    start_valve_current_measurement();
+  } else {
+    start_other_measurements();
+  }
+}
 
 void ThermComponent::dump_config() {}
 
