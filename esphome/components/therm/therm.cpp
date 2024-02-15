@@ -236,7 +236,7 @@ void ThermComponent::start_valve_current_measurement() {
     this->mark_failed();
     return;
   }
-  set_timeout(duration, std::bind(&ThermComponent::measurement_callback, this));
+  set_timeout(duration, std::bind(&ThermComponent::measurement_callback, this, 0));
 }
 
 void ThermComponent::start_other_measurements() {
@@ -298,7 +298,7 @@ void ThermComponent::measurement_callback(uint8_t retry_count) {
       break;
     case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
     case State::OTHER_MEASUREMENTS_COMPLETED:
-      ESP_LOGE(TAG, "Invalid state %d", state_);
+      ESP_LOGE(TAG, "Invalid state %d", static_cast<uint8_t>(state_));
       break;
   }
 }

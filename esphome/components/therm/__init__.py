@@ -57,7 +57,7 @@ async def to_code(config):
     await i2c.register_i2c_device(var, config)
 
     pin = await cg.gpio_pin_expression(config[CONF_VALVE_OUTPUT])
-    cg.add(var.set_value_output(pin))
+    cg.add(var.set_valve_output(pin))
 
     if CONF_FAN_OUTPUT in config:
         fan_out = await cg.get_variable(config[CONF_FAN_OUTPUT])
