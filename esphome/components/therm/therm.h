@@ -70,7 +70,7 @@ enum class State {
   VALVE_CURRENT_MEASUREMENT_COMPLETED,
   OTHER_MEASUREMENTS_WAIT,
   OTHER_MEASUREMENTS_COMPLETED,
-}
+};
 
 class ThermComponent : public i2c::I2CDevice, public PollingComponent {
  friend class ThermOutput;
@@ -122,7 +122,7 @@ class ThermComponent : public i2c::I2CDevice, public PollingComponent {
     sensor::Sensor *current_sensor_[3] = {nullptr, nullptr, nullptr};
     sensor::Sensor *power_sensor_[3] = {nullptr, nullptr, nullptr};
 
-    State state_ = OTHER_MEASUREMENTS_COMPLETED;
+    State state_ = State::OTHER_MEASUREMENTS_COMPLETED;
 
     float valve_value_ = 0.0;
     float fan_value_ = 0.0;
