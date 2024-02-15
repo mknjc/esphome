@@ -105,7 +105,7 @@ class ThermComponent : public i2c::I2CDevice, public PollingComponent {
 
     void start_valve_current_measurement();
     void start_other_measurements();
-    void measurement_callback();
+    void measurement_callback(uint8_t retry_count);
 
     void read_bus_voltage(uint8_t ch);
     void read_shunt(uint8_t ch);

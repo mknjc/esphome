@@ -222,43 +222,38 @@ void ThermComponent::update_valve() {
   }
 }
 
-void ThermComponent::update_fan() {
-}
+void ThermComponent::update_fan() {}
 
 void ThermComponent::start_valve_current_measurement() {
   this->state_ = State::VALVE_CURRENT_MEASUREMENT_WAIT;
   this->valve_output_->digital_write(true);
 
-    auto [config, duration] = calculate_config(MeasurementParameter{
-        IntegrationTime::US8244,
-        Averaging::SAMPLE_1,
-        Channel::CHANNEL1_SHUNT
-        }, true);
+  auto [config, duration] = calculate_config(
+      MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_1, Channel::CHANNEL1_SHUNT}, true);
 
-    if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
-      ESP_LOGE(TAG, "Error setting config");
-      this->mark_failed();
-      return;
-    }
-    set_timeout(duration, std::bind(&ThermComponent::measurement_callback, this));
+  if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
+    ESP_LOGE(TAG, "Error setting config");
+    this->mark_failed();
+    return;
+  }
+  set_timeout(duration, std::bind(&ThermComponent::measurement_callback, this));
 }
 
 void ThermComponent::start_other_measurements() {
   this->state_ = State::OTHER_MEASUREMENTS_WAIT;
 
-    auto [config, duration] = calculate_config(MeasurementParameter{
-        IntegrationTime::US8244,
-        Averaging::SAMPLE_16,
-        Channel::CHANNEL1_BUS | Channel::CHANNEL2_BUS | Channel::CHANNEL3_BUS |
-        Channel::CHANNEL2_SHUNT | Channel::CHANNEL3_SHUNT
-        }, true);
+  auto [config, duration] =
+      calculate_config(MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_16,
+                                            Channel::CHANNEL1_BUS | Channel::CHANNEL2_BUS | Channel::CHANNEL3_BUS |
+                                                Channel::CHANNEL2_SHUNT | Channel::CHANNEL3_SHUNT},
+                       true);
 
-    if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
-      ESP_LOGE(TAG, "Error setting config");
-      this->mark_failed();
-      return;
-    }
-    set_timeout(duration, std::bind(&ThermComponent::measurement_callback, this));
+  if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
+    ESP_LOGE(TAG, "Error setting config");
+    this->mark_failed();
+    return;
+  }
+  set_timeout(duration, std::bind(&ThermComponent::measurement_callback, this, 0));
 }
 
 void ThermComponent::read_bus_voltage(uint8_t ch) {
@@ -273,16 +268,38 @@ void ThermComponent::read_bus_voltage(uint8_t ch) {
   }
 }
 
-void ThermComponent::measurement_callback() {
-  switch (state_)
-  {
-  case State::VALVE_CURRENT_MEASUREMENT_WAIT:
-    state_ = State::VALVE_CURRENT_MEASUREMENT_COMPLETED;
-    this->valve_output_->digital_write(this->valve_state_);
-    break;
-  case State::OTHER_MEASUREMENTS_WAIT:
-    state_ = State::OTHER_MEASUREMENTS_COMPLETED;
-    break;
+void ThermComponent::measurement_callback(uint8_t retry_count) {
+  uint16_t mask;
+  if (!this->read_bytes_16(INA3221_REGISTER_MASK_ENABLE, &mask, 1)) {
+    ESP_LOGE(TAG, "Error reading mask");
+    this->mark_failed();
+    return;
+  }
+
+  if (mask & 0x1) {
+    if (retry_count < 10) {
+      ESP_LOGI(TAG, "Measurement not finished");
+      set_timeout(100, std::bind(&ThermComponent::measurement_callback, this, retry_count + 1));
+      return;
+    } else {
+      ESP_LOGE(TAG, "Measurement not finished after 10 retries");
+      this->mark_failed();
+      return;
+    }
+  }
+
+  switch (state_) {
+    case State::VALVE_CURRENT_MEASUREMENT_WAIT:
+      state_ = State::VALVE_CURRENT_MEASUREMENT_COMPLETED;
+      this->valve_output_->digital_write(this->valve_state_);
+      break;
+    case State::OTHER_MEASUREMENTS_WAIT:
+      state_ = State::OTHER_MEASUREMENTS_COMPLETED;
+      break;
+    case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
+    case State::OTHER_MEASUREMENTS_COMPLETED:
+      ESP_LOGE(TAG, "Invalid state %d", state_);
+      break;
   }
 }
 
@@ -306,21 +323,20 @@ void ThermComponent::update() {
   update_valve();
   update_fan();
 
-  switch (state_)
-  {
-  case State::VALVE_CURRENT_MEASUREMENT_WAIT:
-  case State::OTHER_MEASUREMENTS_WAIT:
-    return;
-  case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
-    read_shunt(0);
-    break;
-  case State::OTHER_MEASUREMENTS_COMPLETED:
-    read_bus_voltage(0);
-    read_bus_voltage(1);
-    read_bus_voltage(2);
-    read_shunt(1);
-    read_shunt(2);
-    break;
+  switch (state_) {
+    case State::VALVE_CURRENT_MEASUREMENT_WAIT:
+    case State::OTHER_MEASUREMENTS_WAIT:
+      return;
+    case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
+      read_shunt(0);
+      break;
+    case State::OTHER_MEASUREMENTS_COMPLETED:
+      read_bus_voltage(0);
+      read_bus_voltage(1);
+      read_bus_voltage(2);
+      read_shunt(1);
+      read_shunt(2);
+      break;
   }
 
   if (millis() - last_valve_measurement_ > 10000) {
