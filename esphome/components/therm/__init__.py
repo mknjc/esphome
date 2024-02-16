@@ -11,6 +11,8 @@ from esphome.const import (
     CONF_RED,
 )
 
+MULTI_CONF = True
+
 CODEOWNERS = ["@mknjc"]
 DEPENDENCIES = ["i2c"]
 
