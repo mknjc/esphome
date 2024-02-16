@@ -92,6 +92,8 @@ class ThermComponent : public i2c::I2CDevice, public PollingComponent {
   void set_current_sensor(uint8_t ch, sensor::Sensor *current_sensor) { this->current_sensor_[ch] = current_sensor;}
   void set_power_sensor(uint8_t ch, sensor::Sensor *power_sensor) { this->power_sensor_[ch] = power_sensor;}
 
+  void set_current_interval(uint32_t current_interval) { this->current_interval_ = current_interval; }
+
   void update() override;
 
   private:
@@ -131,6 +133,8 @@ class ThermComponent : public i2c::I2CDevice, public PollingComponent {
     bool valve_state_{false};
 
     uint32_t last_valve_measurement_{0};
+
+    uint32_t current_interval_{10000};
 };
 
 

@@ -25,6 +25,8 @@ CONF_VALVE_SHUNT_RESISTANCE = "valve_shunt_resistance"
 CONF_FAN_SHUNT_RESISTANCE = "fan_shunt_resistance"
 CONF_CONTINUOUS_SHUNT_RESISTANCE = "continuous_shunt_resistance"
 
+CONF_VALVE_CURRENT_INTERVAL = "valve_current_interval"
+
 therm_ns = cg.esphome_ns.namespace("therm")
 ThermComponent = therm_ns.class_("ThermComponent", cg.PollingComponent, i2c.I2CDevice)
 
@@ -45,6 +47,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_FAN_SHUNT_RESISTANCE): cv.positive_float,
             cv.Optional(CONF_CONTINUOUS_SHUNT_RESISTANCE): cv.positive_float,
 
+            cv.Optional(CONF_VALVE_CURRENT_INTERVAL, default="10s"): cv.positive_time_period_milliseconds,
         }
     )
     .extend(i2c.i2c_device_schema(0x40))
@@ -84,3 +87,5 @@ async def to_code(config):
     
     if CONF_CONTINUOUS_SHUNT_RESISTANCE in config:
         cg.add(var.set_shunt_resistance(0, config[CONF_CONTINUOUS_SHUNT_RESISTANCE]))
+
+    cg.add(var.set_current_interval(config[CONF_VALVE_CURRENT_INTERVAL]))

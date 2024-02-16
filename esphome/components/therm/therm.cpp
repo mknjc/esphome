@@ -225,7 +225,11 @@ void ThermComponent::update_valve() {
   }
 }
 
-void ThermComponent::update_fan() {}
+void ThermComponent::update_fan() {
+  if (this->fan_output_ {
+    this->fan_output_->write_state(this->fan_value_);
+  }
+}
 
 void ThermComponent::start_valve_current_measurement() {
   ESP_LOGV(TAG, "Starting valve current measurement");
@@ -345,7 +349,7 @@ void ThermComponent::update() {
       break;
   }
 
-  if (millis() - last_valve_measurement_ > 10000 && state_ != State::VALVE_CURRENT_MEASUREMENT_COMPLETED) {
+  if (millis() - last_valve_measurement_ > current_interval_ && state_ != State::VALVE_CURRENT_MEASUREMENT_COMPLETED) {
     last_valve_measurement_ = millis();
     start_valve_current_measurement();
   } else {
