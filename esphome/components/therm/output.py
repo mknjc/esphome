@@ -29,7 +29,7 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await output.register_output(var, config)
 
-    paren = await cg.get_variable(config[CONF_THERM_ID])
-    var.set_parent(paren)
+    parent = await cg.get_variable(config[CONF_THERM_ID])
+    cg.add(var.set_parent(parent))
 
-    var.set_type(TYPE[config[CONF_TYPE]])
+    cg.add(var.set_type(TYPE[config[CONF_TYPE]]))
