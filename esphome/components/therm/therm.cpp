@@ -158,7 +158,7 @@ void ThermComponent::setup() {
     mark_failed();
     return;
   }
-  manufacturer_id = i2ctohs(manufacturer_id);
+  manufacturer_id = convert_big_endian(manufacturer_id);
   if (manufacturer_id != 0x5449) {
     ESP_LOGE(TAG, "Invalid manufacturer id: 0x%04X", manufacturer_id);
     mark_failed();
@@ -170,7 +170,7 @@ void ThermComponent::setup() {
     mark_failed();
     return;
   }
-  die_id = i2ctohs(die_id);
+  die_id = convert_big_endian(die_id);
   if (die_id != 0x3220) {
     ESP_LOGE(TAG, "Invalid die id: 0x%04X", die_id);
     mark_failed();
