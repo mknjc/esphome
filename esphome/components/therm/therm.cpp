@@ -152,23 +152,25 @@ bool ThermComponent::measure(MeasurementParameter param) {
 void ThermComponent::setup() {
   uint16_t manufacturer_id;
   uint16_t die_id;
-  auto ret = read_bytes_16(INA3221_REGISTER_MANUFACTURER_ID, &manufacturer_id, 1);
+  auto ret = read_register(INA3221_REGISTER_MANUFACTURER_ID, reinterpret_cast<uint8_t*>(&manufacturer_id), 2);
   if (ret != i2c::ERROR_OK) {
     ESP_LOGE(TAG, "Error reading manufacturer id: %d", ret);
     mark_failed();
     return;
   }
+  manufacturer_id = i2ctohs(manufacturer_id);
   if (manufacturer_id != 0x5449) {
     ESP_LOGE(TAG, "Invalid manufacturer id: 0x%04X", manufacturer_id);
     mark_failed();
     return;
   }
-  ret = read_bytes_16(INA3221_REGISTER_DIE_ID, &die_id, 1);
+  ret = read_register(INA3221_REGISTER_DIE_ID, reinterpret_cast<uint8_t*>(&die_id), 2);
   if (ret != i2c::ERROR_OK) {
     ESP_LOGE(TAG, "Error reading die id: %d", ret);
     mark_failed();
     return;
   }
+  die_id = i2ctohs(die_id);
   if (die_id != 0x3220) {
     ESP_LOGE(TAG, "Invalid die id: 0x%04X", die_id);
     mark_failed();
