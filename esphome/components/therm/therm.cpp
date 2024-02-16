@@ -341,7 +341,7 @@ void ThermComponent::update() {
       break;
   }
 
-  if (millis() - last_valve_measurement_ > 10000) {
+  if (millis() - last_valve_measurement_ > 10000 && state_ != State::VALVE_CURRENT_MEASUREMENT_COMPLETED) {
     last_valve_measurement_ = millis();
     start_valve_current_measurement();
   } else {
