@@ -77,10 +77,10 @@ async def to_code(config):
         pin = await cg.gpio_pin_expression(config[CONF_BLUE])
         cg.add(var.set_b_output(pin))
 
-    cg.add(var.set_shunt_resistance(2, config[CONF_VALVE_SHUNT_RESISTANCE]))
+    cg.add(var.set_shunt_resistance(1, config[CONF_VALVE_SHUNT_RESISTANCE]))
     
     if CONF_FAN_SHUNT_RESISTANCE in config:
-        cg.add(var.set_shunt_resistance(3, config[CONF_FAN_SHUNT_RESISTANCE]))
+        cg.add(var.set_shunt_resistance(2, config[CONF_FAN_SHUNT_RESISTANCE]))
     
     if CONF_CONTINUOUS_SHUNT_RESISTANCE in config:
-        cg.add(var.set_shunt_resistance(1, config[CONF_CONTINUOUS_SHUNT_RESISTANCE]))
+        cg.add(var.set_shunt_resistance(0, config[CONF_CONTINUOUS_SHUNT_RESISTANCE]))
