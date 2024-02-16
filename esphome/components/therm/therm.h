@@ -102,6 +102,7 @@ class ThermComponent : public i2c::I2CDevice, public PollingComponent {
       this->fan_value_ = value;
 
     if (this->fan_output_) {
+      ESP_LOGD("therm", "Setting fan value: %f", value);
       this->fan_output_->write_state(value);
     }
   }

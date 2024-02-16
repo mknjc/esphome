@@ -226,6 +226,7 @@ void ThermComponent::update_valve() {
 }
 
 void ThermComponent::update_fan() {
+      ESP_LOGD(TAG, "Fan value is: %f", this->fan_value_);
 }
 
 void ThermComponent::start_valve_current_measurement() {
