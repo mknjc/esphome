@@ -8,7 +8,7 @@ DEPENDENCIES = ["therm"]
 
 ThermOutput = therm_ns.class_("ThermOutput", output.FloatOutput)
 
-OutputType = therm_ns.enum("OutputType")
+OutputType = therm_ns.enum("OutputType", is_class=True)
 TYPE = {
     "valve": OutputType.VALVE,
     "fan": OutputType.FAN,
