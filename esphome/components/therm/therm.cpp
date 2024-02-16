@@ -114,9 +114,9 @@ std::pair<uint16_t, uint16_t> static calculate_config(MeasurementParameter param
   // 0b000000000000x00 << 2 Operating mode (1 = continuous)
   config |= single_shot ? 0b0000000000000000 : 0b0000000000000100;
   // 0b0000000000000x0 << 1 Bus voltage measurement
-  config |= bus ? 0b0000000000000000 : 0b0000000000000010;
+  config |= bus ? 0b0000000000000010 : 0b0000000000000000;
   // 0b00000000000000x << 0 Shunt voltage measurement
-  config |= shunt ? 0b0000000000000000 : 0b0000000000000001;
+  config |= shunt ? 0b0000000000000010 : 0b0000000000000000;
 
   return std::make_pair(config, (duration * channel_count) / 1000);
 }
