@@ -127,6 +127,7 @@ bool ThermComponent::measure(MeasurementParameter param) {
     ESP_LOGE(TAG, "Error setting config");
     return false;
   }
+  ESP_LOGD(TAG, "Waiting for %d ms", duration);
   delay(duration);
 
   uint16_t mask_reg;
@@ -183,7 +184,7 @@ void ThermComponent::setup() {
     this->mark_failed();
     return;
   }
-  delay(1);
+  delay(10);
 
   // inital read voltages
   measure(MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_1,
