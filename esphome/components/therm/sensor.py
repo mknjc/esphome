@@ -69,7 +69,7 @@ CONFIG_SCHEMA = (
 async def to_code(config):
     paren = await cg.get_variable(config[CONF_THERM_ID])
 
-    for i, channel in enumerate([CONF_VALVE, CONF_FAN, CONF_CONTINUOUS]):
+    for i, channel in enumerate([CONF_CONTINUOUS, CONF_VALVE, CONF_FAN]):
         if channel not in config:
             continue
         conf = config[channel]

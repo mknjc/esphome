@@ -22,13 +22,17 @@ CONFIG_SCHEMA = output.FLOAT_OUTPUT_SCHEMA.extend(
         cv.GenerateID(CONF_THERM_ID): cv.use_id(ThermComponent),
         cv.Required(CONF_TYPE): cv.enum(TYPE, lower=True),
     }
-)
+).extend(cv.COMPONENT_SCHEMA)
 
 
 async def to_code(config):
-    paren = await cg.get_variable(config[CONF_THERM_ID])
     var = cg.new_Pvariable(config[CONF_ID])
+
+    await output.register_output(var, config)
+
+    paren = await cg.get_variable(config[CONF_THERM_ID])
     var.set_parent(paren)
+
     var.set_type(TYPE[config[CONF_TYPE]])
     await output.register_output(var, config)
     return var

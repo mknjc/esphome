@@ -205,7 +205,7 @@ void ThermComponent::setup() {
     this->mark_failed();
     return;
   }
-  ESP_LOGD(TAG, "Valve voltage: %f, Fan voltage: %f, Continuous voltage: %f", valve_voltage / 1000.0,
+  ESP_LOGD(TAG, "Continuous voltage: %f, Valve voltage: %f, Fan voltage: %f", valve_voltage / 1000.0,
            fan_voltage / 1000.0, continuous_voltage / 1000.0);
 }
 
@@ -233,7 +233,7 @@ void ThermComponent::start_valve_current_measurement() {
   this->valve_output_->digital_write(true);
 
   auto [config, duration] = calculate_config(
-      MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_1, Channel::CHANNEL1_SHUNT}, true);
+      MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_1, Channel::CHANNEL2_SHUNT}, true);
 
   if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
     ESP_LOGE(TAG, "Error setting config");
@@ -250,7 +250,7 @@ void ThermComponent::start_other_measurements() {
   auto [config, duration] =
       calculate_config(MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_16,
                                             Channel::CHANNEL1_BUS | Channel::CHANNEL2_BUS | Channel::CHANNEL3_BUS |
-                                                Channel::CHANNEL2_SHUNT | Channel::CHANNEL3_SHUNT},
+                                                Channel::CHANNEL1_SHUNT | Channel::CHANNEL3_SHUNT},
                        true);
 
   if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
@@ -334,13 +334,13 @@ void ThermComponent::update() {
     case State::OTHER_MEASUREMENTS_WAIT:
       return;
     case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
-      read_shunt(0);
+      read_shunt(1);
       break;
     case State::OTHER_MEASUREMENTS_COMPLETED:
       read_bus_voltage(0);
       read_bus_voltage(1);
       read_bus_voltage(2);
-      read_shunt(1);
+      read_shunt(0);
       read_shunt(2);
       break;
   }
