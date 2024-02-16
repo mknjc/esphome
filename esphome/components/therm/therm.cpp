@@ -272,6 +272,22 @@ void ThermComponent::read_bus_voltage(uint8_t ch) {
     this->bus_voltage_sensor_[ch]->publish_state(bus_voltage / 1000.0);
   }
 }
+void ThermComponent::read_shunt(uint8_t ch) {
+  uint16_t shunt_voltage;
+  if (!this->read_bytes_16(INA3221_REGISTER_CHANNEL1_SHUNT_VOLTAGE + ch * 2, &shunt_voltage, 1)) {
+    ESP_LOGE(TAG, "Error reading shunt voltage");
+    this->mark_failed();
+    return;
+  }
+  ESP_LOGD(TAG, "Raw Shunt voltage for channel %d: %d", ch, shunt_voltage);
+  const float shunt_voltage_v = int16_t(shunt_voltage) * 40.0f / 8.0f / 1000000.0f;
+  if (this->shunt_voltage_sensor_[ch]) {
+    this->shunt_voltage_sensor_[ch]->publish_state(shunt_voltage_v);
+  }
+  if (this->current_sensor_[ch] && this->shunt_resistance_[ch] > 0.0f) {
+    this->current_sensor_[ch]->publish_state(shunt_voltage_v / this->shunt_resistance_[ch]);
+  }
+}
 
 void ThermComponent::measurement_callback(uint8_t retry_count) {
   uint16_t mask;
@@ -308,21 +324,6 @@ void ThermComponent::measurement_callback(uint8_t retry_count) {
   }
 }
 
-void ThermComponent::read_shunt(uint8_t ch) {
-  uint16_t shunt_voltage;
-  if (!this->read_bytes_16(INA3221_REGISTER_CHANNEL1_SHUNT_VOLTAGE + ch * 2, &shunt_voltage, 1)) {
-    ESP_LOGE(TAG, "Error reading shunt voltage");
-    this->mark_failed();
-    return;
-  }
-  const float shunt_voltage_v = int16_t(shunt_voltage) * 40.0f / 8.0f / 1000000.0f;
-  if (this->shunt_voltage_sensor_[ch]) {
-    this->shunt_voltage_sensor_[ch]->publish_state(shunt_voltage_v);
-  }
-  if (this->current_sensor_[ch] && this->shunt_resistance_[ch] > 0.0f) {
-    this->current_sensor_[ch]->publish_state(shunt_voltage_v / this->shunt_resistance_[ch]);
-  }
-}
 
 void ThermComponent::update() {
   update_valve();
