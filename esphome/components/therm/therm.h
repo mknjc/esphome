@@ -56,7 +56,7 @@ enum class OutputType {
 
 class ThermComponent;
 
-class ThermOutput : public output::FloatOutput, Parented<ThermComponent> {
+class ThermOutput : public output::FloatOutput, public Parented<ThermComponent> {
  public:
    void set_type(OutputType type) { this->type_ = type; }
  protected:
