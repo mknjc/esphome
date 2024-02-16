@@ -30,7 +30,7 @@ ThermComponent = therm_ns.class_("ThermComponent", cg.PollingComponent, i2c.I2CD
 CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
-            cv.GenerateID(): cv.declare_id(ThermComponent),
+            cv.Required(CONF_ID): cv.declare_id(ThermComponent),
 
             cv.Required(CONF_VALVE_OUTPUT): pins.gpio_output_pin_schema,
             cv.Optional(CONF_FAN_OUTPUT): cv.use_id(LEDCOutput),

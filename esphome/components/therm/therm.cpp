@@ -127,7 +127,7 @@ bool ThermComponent::measure(MeasurementParameter param) {
     ESP_LOGE(TAG, "Error setting config");
     return false;
   }
-  ESP_LOGD(TAG, "Waiting for %d ms", duration);
+  ESP_LOGV(TAG, "Waiting for %d ms", duration);
   delay(duration);
 
   uint16_t mask_reg;
@@ -228,7 +228,7 @@ void ThermComponent::update_valve() {
 void ThermComponent::update_fan() {}
 
 void ThermComponent::start_valve_current_measurement() {
-  ESP_LOGD(TAG, "Starting valve current measurement");
+  ESP_LOGV(TAG, "Starting valve current measurement");
   this->state_ = State::VALVE_CURRENT_MEASUREMENT_WAIT;
   this->valve_output_->digital_write(true);
 
@@ -244,7 +244,7 @@ void ThermComponent::start_valve_current_measurement() {
 }
 
 void ThermComponent::start_other_measurements() {
-  ESP_LOGD(TAG, "Starting other measurements");
+  ESP_LOGV(TAG, "Starting other measurements");
   this->state_ = State::OTHER_MEASUREMENTS_WAIT;
 
   auto [config, duration] =
@@ -279,7 +279,7 @@ void ThermComponent::read_shunt(uint8_t ch) {
     this->mark_failed();
     return;
   }
-  ESP_LOGD(TAG, "Raw Shunt voltage for channel %d: %d", ch, shunt_voltage);
+  ESP_LOGV(TAG, "Raw Shunt voltage for channel %d: %d", ch, shunt_voltage);
   const float shunt_voltage_v = int16_t(shunt_voltage) * 40.0f / 8.0f / 1000000.0f;
   if (this->shunt_voltage_sensor_[ch]) {
     this->shunt_voltage_sensor_[ch]->publish_state(shunt_voltage_v);
@@ -308,7 +308,7 @@ void ThermComponent::measurement_callback(uint8_t retry_count) {
       return;
     }
   }
-  ESP_LOGD(TAG, "Measurement finished State: %d", static_cast<uint8_t>(state_));
+  ESP_LOGV(TAG, "Measurement finished State: %d", static_cast<uint8_t>(state_));
   switch (state_) {
     case State::VALVE_CURRENT_MEASUREMENT_WAIT:
       state_ = State::VALVE_CURRENT_MEASUREMENT_COMPLETED;
