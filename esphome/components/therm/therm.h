@@ -98,7 +98,13 @@ class ThermComponent : public i2c::I2CDevice, public PollingComponent {
 
   private:
     void set_valve_value(float value) { this->valve_value_ = value; }
-    void set_fan_value(float value) { this->fan_value_ = value; }
+    void set_fan_value(float value) {
+      this->fan_value_ = value;
+
+    if (this->fan_output_) {
+      this->fan_output_->write_state(value);
+    }
+  }
 
     bool measure(MeasurementParameter param);
 

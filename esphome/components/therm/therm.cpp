@@ -226,9 +226,6 @@ void ThermComponent::update_valve() {
 }
 
 void ThermComponent::update_fan() {
-  if (this->fan_output_) {
-    this->fan_output_->write_state(this->fan_value_);
-  }
 }
 
 void ThermComponent::start_valve_current_measurement() {
