@@ -337,6 +337,7 @@ void ThermComponent::update() {
     switch (state_) {
       case State::OTHER_MEASUREMENTS_COMPLETED: {
         this->valve_output_->digital_write(true);  // do it as fast as possible to help with measurement stabilisation
+        valve_powered_ = true;
         ESP_LOGV(TAG, "Starting valve current measurement");
         this->state_ = State::VALVE_CURRENT_MEASUREMENT_WAIT;
 
@@ -366,8 +367,10 @@ void ThermComponent::update() {
   }
 
   if (cycle_timeout > 0) {
-    ESP_LOGV(TAG, "Setting valve callback with timeout %d", cycle_timeout);
-    valve_powered_ = true;
+    if (!valve_powered_) {
+      valve_powered_ = true;
+      this->valve_output_->digital_write(true);
+    }
     set_timeout("valve_callback", cycle_timeout, std::bind(&ThermComponent::valve_callback, this));
   }
 
