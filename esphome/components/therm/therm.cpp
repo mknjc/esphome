@@ -366,6 +366,7 @@ void ThermComponent::update() {
   }
 
   if (cycle_timeout > 0) {
+    ESP_LOGV(TAG, "Setting valve callback with timeout %d", cycle_timeout);
     valve_powered_ = true;
     set_timeout("valve_callback", cycle_timeout, std::bind(&ThermComponent::valve_callback, this));
   }
