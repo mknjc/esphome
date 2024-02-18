@@ -1,5 +1,7 @@
 #include "therm.h"
 
+#include "esphome/core/application.h"
+
 namespace esphome {
 namespace therm {
 
@@ -114,7 +116,7 @@ std::pair<uint16_t, uint16_t> static calculate_config(MeasurementParameter param
   // 0b000000000000x00 << 2 Operating mode (1 = continuous)
   config |= single_shot ? 0b0000000000000000 : 0b0000000000000100;
   // 0b0000000000000x0 << 1 Bus voltage measurement
-  config |= bus ?   0b0000000000000010 : 0b0000000000000000;
+  config |= bus ? 0b0000000000000010 : 0b0000000000000000;
   // 0b00000000000000x << 0 Shunt voltage measurement
   config |= shunt ? 0b0000000000000001 : 0b0000000000000000;
 
@@ -153,7 +155,7 @@ bool ThermComponent::measure(MeasurementParameter param) {
 void ThermComponent::setup() {
   uint16_t manufacturer_id;
   uint16_t die_id;
-  auto ret = read_register(INA3221_REGISTER_MANUFACTURER_ID, reinterpret_cast<uint8_t*>(&manufacturer_id), 2);
+  auto ret = read_register(INA3221_REGISTER_MANUFACTURER_ID, reinterpret_cast<uint8_t *>(&manufacturer_id), 2);
   if (ret != i2c::ERROR_OK) {
     ESP_LOGE(TAG, "Error reading manufacturer id: %d", ret);
     mark_failed();
@@ -165,7 +167,7 @@ void ThermComponent::setup() {
     mark_failed();
     return;
   }
-  ret = read_register(INA3221_REGISTER_DIE_ID, reinterpret_cast<uint8_t*>(&die_id), 2);
+  ret = read_register(INA3221_REGISTER_DIE_ID, reinterpret_cast<uint8_t *>(&die_id), 2);
   if (ret != i2c::ERROR_OK) {
     ESP_LOGE(TAG, "Error reading die id: %d", ret);
     mark_failed();
@@ -209,41 +211,26 @@ void ThermComponent::setup() {
            fan_voltage / 1000.0, continuous_voltage / 1000.0);
 }
 
-void ThermComponent::update_valve() {
-  this->valve_accum_ += this->valve_value_;
-  const bool next_state = this->valve_accum_ > 0;
+void ThermComponent::valve_callback() {
+  this->valve_output_->digital_write(false);
 
-  if (next_state) {
-    this->valve_accum_ -= 1.;
-  }
-
-  if (next_state != this->valve_state_) {
-    this->valve_state_ = next_state;
-    if (this->valve_output_ && this->state_ != State::VALVE_CURRENT_MEASUREMENT_WAIT) {
-      this->valve_output_->digital_write(next_state);
+  if (this->state_ == State::VALVE_CURRENT_MEASUREMENT_WAIT) {
+    uint16_t mask;
+    if (!this->read_bytes_16(INA3221_REGISTER_MASK_ENABLE, &mask, 1)) {
+      ESP_LOGE(TAG, "Error reading mask");
+      this->mark_failed();
+      return;
     }
+
+    if ((mask & 0x1) == 0) {
+      ESP_LOGW(TAG, "Valve current measurement not finished");
+    }
+    read_shunt(1);
+    this->state_ = State::VALVE_CURRENT_MEASUREMENT_COMPLETED;
   }
 }
 
-void ThermComponent::update_fan() {
-      ESP_LOGD(TAG, "Fan value is: %f", this->fan_value_);
-}
-
-void ThermComponent::start_valve_current_measurement() {
-  ESP_LOGV(TAG, "Starting valve current measurement");
-  this->state_ = State::VALVE_CURRENT_MEASUREMENT_WAIT;
-  this->valve_output_->digital_write(true);
-
-  auto [config, duration] = calculate_config(
-      MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_1, Channel::CHANNEL2_SHUNT}, true);
-
-  if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
-    ESP_LOGE(TAG, "Error setting config");
-    this->mark_failed();
-    return;
-  }
-  set_timeout(duration, std::bind(&ThermComponent::measurement_callback, this, 0));
-}
+void ThermComponent::update_fan() { ESP_LOGD(TAG, "Fan value is: %f", this->fan_value_); }
 
 void ThermComponent::start_other_measurements() {
   ESP_LOGV(TAG, "Starting other measurements");
@@ -312,13 +299,16 @@ void ThermComponent::measurement_callback(uint8_t retry_count) {
   }
   ESP_LOGV(TAG, "Measurement finished State: %d", static_cast<uint8_t>(state_));
   switch (state_) {
-    case State::VALVE_CURRENT_MEASUREMENT_WAIT:
-      state_ = State::VALVE_CURRENT_MEASUREMENT_COMPLETED;
-      this->valve_output_->digital_write(this->valve_state_);
-      break;
     case State::OTHER_MEASUREMENTS_WAIT:
+      read_bus_voltage(0);
+      read_bus_voltage(1);
+      read_bus_voltage(2);
+      read_shunt(0);
+      read_shunt(2);
       state_ = State::OTHER_MEASUREMENTS_COMPLETED;
       break;
+    case State::VALVE_CURRENT_MEASUREMENT_WAIT:  // this should never happen here because its handled in the
+                                                 // valve_callback
     case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
     case State::OTHER_MEASUREMENTS_COMPLETED:
       ESP_LOGE(TAG, "Invalid state %d", static_cast<uint8_t>(state_));
@@ -326,33 +316,49 @@ void ThermComponent::measurement_callback(uint8_t retry_count) {
   }
 }
 
-
 void ThermComponent::update() {
-  update_valve();
-  update_fan();
-
-  switch (state_) {
-    case State::VALVE_CURRENT_MEASUREMENT_WAIT:
-    case State::OTHER_MEASUREMENTS_WAIT:
-      return;
-    case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
-      read_shunt(1);
-      break;
-    case State::OTHER_MEASUREMENTS_COMPLETED:
-      read_bus_voltage(0);
-      read_bus_voltage(1);
-      read_bus_voltage(2);
-      read_shunt(0);
-      read_shunt(2);
-      break;
+  if (valve_powered_) {  // the timeout didn't trigger yet, we call it to end the cycle
+    App.scheduler.cancel_timeout(this, "valve_callback");
+    valve_callback();
   }
 
-  if (millis() - last_valve_measurement_ > current_interval_ && state_ != State::VALVE_CURRENT_MEASUREMENT_COMPLETED) {
+  auto cycle_timeout = uint32_t(float(this->update_interval_) * this->valve_value_);
+
+  if (millis() - last_valve_measurement_ < current_interval_) {  // its time for a new measurement
+    switch (state_) {
+      case State::VALVE_CURRENT_MEASUREMENT_COMPLETED: { // last measurement was a valve current measurement
+        this->valve_output_->digital_write(true);  // do it as fast as possible to help with measurement stabilisation
+        ESP_LOGV(TAG, "Starting valve current measurement");
+        this->state_ = State::VALVE_CURRENT_MEASUREMENT_WAIT;
+
+        auto [config, duration] = calculate_config(
+            MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_1, Channel::CHANNEL2_SHUNT}, true);
+
+        if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
+          ESP_LOGE(TAG, "Error setting config");
+          this->mark_failed();
+          return;
+        }
+        cycle_timeout = std::max(cycle_timeout, uint32_t(duration));
+        break;
+      }
+      case State::OTHER_MEASUREMENTS_COMPLETED:
+        start_other_measurements();
+        break;
+      case State::VALVE_CURRENT_MEASUREMENT_WAIT:
+      case State::OTHER_MEASUREMENTS_WAIT:  // we are waiting for a measurement to finish
+        ESP_LOGW(TAG, "Waiting for a measurement to finish");
+        break;
+    }
     last_valve_measurement_ = millis();
-    start_valve_current_measurement();
-  } else {
-    start_other_measurements();
   }
+
+  if (cycle_timeout > 0) {
+    valve_powered_ = true;
+    App.scheduler.set_timeout(this, "valve_callback", cycle_timeout, std::bind(&ThermComponent::valve_callback, this));
+  }
+
+  update_fan();
 }
 
 void ThermComponent::dump_config() {}

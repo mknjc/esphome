@@ -109,10 +109,10 @@ class ThermComponent : public i2c::I2CDevice, public PollingComponent {
 
     bool measure(MeasurementParameter param);
 
-    void update_valve();
+    void valve_callback();
+
     void update_fan();
 
-    void start_valve_current_measurement();
     void start_other_measurements();
     void measurement_callback(uint8_t retry_count);
 
@@ -136,12 +136,10 @@ class ThermComponent : public i2c::I2CDevice, public PollingComponent {
     float valve_value_ = 0.0;
     float fan_value_ = 0.0;
 
-    float valve_accum_{0};
-    bool valve_state_{false};
-
     uint32_t last_valve_measurement_{0};
-
     uint32_t current_interval_{10000};
+
+    bool valve_powered_{false};
 };
 
 
