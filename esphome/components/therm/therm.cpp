@@ -325,6 +325,8 @@ void ThermComponent::update() {
   auto cycle_timeout = uint32_t(float(this->update_interval_) * this->valve_value_);
 
   if (millis() - last_valve_measurement_ < current_interval_) {  // its time for a new measurement
+    ESP_LOGV(TAG, "Starting new measurement cycle");
+
     switch (state_) {
       case State::OTHER_MEASUREMENTS_COMPLETED: {
         this->valve_output_->digital_write(true);  // do it as fast as possible to help with measurement stabilisation
@@ -340,6 +342,7 @@ void ThermComponent::update() {
           return;
         }
         cycle_timeout = std::max(cycle_timeout, uint32_t(duration));
+        ESP_LOGV(TAG, "Cycle time is %d ms", cycle_timeout);
         break;
       }
       case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
@@ -351,6 +354,8 @@ void ThermComponent::update() {
         break;
     }
     last_valve_measurement_ = millis();
+  } else {
+    ESP_LOGV(TAG, "Not starting new measurement cycle");
   }
 
   if (cycle_timeout > 0) {
