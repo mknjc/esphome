@@ -326,7 +326,7 @@ void ThermComponent::update() {
 
   if (millis() - last_valve_measurement_ < current_interval_) {  // its time for a new measurement
     switch (state_) {
-      case State::VALVE_CURRENT_MEASUREMENT_COMPLETED: { // last measurement was a valve current measurement
+      case State::OTHER_MEASUREMENTS_COMPLETED: {
         this->valve_output_->digital_write(true);  // do it as fast as possible to help with measurement stabilisation
         ESP_LOGV(TAG, "Starting valve current measurement");
         this->state_ = State::VALVE_CURRENT_MEASUREMENT_WAIT;
@@ -342,7 +342,7 @@ void ThermComponent::update() {
         cycle_timeout = std::max(cycle_timeout, uint32_t(duration));
         break;
       }
-      case State::OTHER_MEASUREMENTS_COMPLETED:
+      case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
         start_other_measurements();
         break;
       case State::VALVE_CURRENT_MEASUREMENT_WAIT:
