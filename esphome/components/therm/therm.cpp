@@ -212,6 +212,7 @@ void ThermComponent::setup() {
 }
 
 void ThermComponent::valve_callback() {
+  ESP_LOGV(TAG, "Valve callback, state: %d powered: %d", static_cast<uint8_t>(state_), valve_powered_);
   this->valve_output_->digital_write(false);
   valve_powered_ = false;
 
