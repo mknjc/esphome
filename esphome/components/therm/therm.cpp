@@ -213,6 +213,7 @@ void ThermComponent::setup() {
 
 void ThermComponent::valve_callback() {
   this->valve_output_->digital_write(false);
+  valve_powered_ = false;
 
   if (this->state_ == State::VALVE_CURRENT_MEASUREMENT_WAIT) {
     uint16_t mask;
@@ -230,7 +231,7 @@ void ThermComponent::valve_callback() {
   }
 }
 
-void ThermComponent::update_fan() { ESP_LOGD(TAG, "Fan value is: %f", this->fan_value_); }
+void ThermComponent::update_fan() { }
 
 void ThermComponent::start_other_measurements() {
   ESP_LOGV(TAG, "Starting other measurements");
@@ -318,7 +319,7 @@ void ThermComponent::measurement_callback(uint8_t retry_count) {
 
 void ThermComponent::update() {
   if (valve_powered_) {  // the timeout didn't trigger yet, we call it to end the cycle
-    App.scheduler.cancel_timeout(this, "valve_callback");
+    cancel_timeout("valve_callback");
     valve_callback();
   }
 
@@ -355,12 +356,12 @@ void ThermComponent::update() {
     }
     last_valve_measurement_ = millis();
   } else {
-    ESP_LOGV(TAG, "Not starting new measurement cycle");
+    ESP_LOGV(TAG, "Not starting new measurement cycle %d %d %d", millis(), last_valve_measurement_, current_interval_);
   }
 
   if (cycle_timeout > 0) {
     valve_powered_ = true;
-    App.scheduler.set_timeout(this, "valve_callback", cycle_timeout, std::bind(&ThermComponent::valve_callback, this));
+    set_timeout("valve_callback", cycle_timeout, std::bind(&ThermComponent::valve_callback, this));
   }
 
   update_fan();
