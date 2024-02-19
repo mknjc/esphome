@@ -252,7 +252,7 @@ void ThermComponent::loop() {
         this->period_start_ = this->state_start_;
 
         this->valve_measure_counter_++;
-        if (this->valve_measure_counter_ >= this->valve_measure_interval_) {
+        if (this->valve_measure_counter_ >= this->measure_interval_) {
           read_bus_voltage(0);
           read_bus_voltage(1);
           read_bus_voltage(2);

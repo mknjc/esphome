@@ -98,7 +98,7 @@ class ThermComponent : public i2c::I2CDevice, public Component {
   void set_power_sensor(uint8_t ch, sensor::Sensor *power_sensor) { this->power_sensor_[ch] = power_sensor; }
 
   void set_period(uint32_t period) { this->period_ = period; }
-  void set_valve_measure_interval(uint32_t valve_measure_interval) { this->valve_measure_interval_ = valve_measure_interval; }
+  void set_measure_interval(uint32_t measure_interval) { this->measure_interval_ = measure_interval; }
 
   void loop() override;
 
@@ -142,7 +142,7 @@ class ThermComponent : public i2c::I2CDevice, public Component {
   uint32_t period_start_ = 0;
 
   uint32_t valve_measure_counter_ = 0;
-  uint32_t valve_measure_interval_;
+  uint32_t measure_interval_;
 };
 
 }  // namespace therm
