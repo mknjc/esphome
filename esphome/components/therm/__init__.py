@@ -9,6 +9,7 @@ from esphome.const import (
     CONF_GREEN,
     CONF_ID,
     CONF_RED,
+    CONF_PERIOD,
 )
 
 MULTI_CONF = True
@@ -25,10 +26,10 @@ CONF_VALVE_SHUNT_RESISTANCE = "valve_shunt_resistance"
 CONF_FAN_SHUNT_RESISTANCE = "fan_shunt_resistance"
 CONF_CONTINUOUS_SHUNT_RESISTANCE = "continuous_shunt_resistance"
 
-CONF_VALVE_CURRENT_INTERVAL = "valve_current_interval"
+CONF_MEASURE_INTERVAL = "measure_interval"
 
 therm_ns = cg.esphome_ns.namespace("therm")
-ThermComponent = therm_ns.class_("ThermComponent", cg.PollingComponent, i2c.I2CDevice)
+ThermComponent = therm_ns.class_("ThermComponent", cg.Component, i2c.I2CDevice)
 
 
 CONFIG_SCHEMA = cv.All(
@@ -47,11 +48,12 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_FAN_SHUNT_RESISTANCE): cv.positive_float,
             cv.Optional(CONF_CONTINUOUS_SHUNT_RESISTANCE): cv.positive_float,
 
-            cv.Optional(CONF_VALVE_CURRENT_INTERVAL, default="10s"): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_MEASURE_INTERVAL, default=10): cv.positive_not_null_int,
+            cv.Optional(CONF_PERIOD, default="1s"): cv.positive_not_null_time_period,
         }
     )
     .extend(i2c.i2c_device_schema(0x40))
-    .extend(cv.polling_component_schema("10s")),
+    .extend(cv.COMPONENT_SCHEMA),
     cv.has_none_or_all_keys(CONF_FAN_OUTPUT, CONF_FAN_SHUNT_RESISTANCE)
 )
 
@@ -88,4 +90,5 @@ async def to_code(config):
     if CONF_CONTINUOUS_SHUNT_RESISTANCE in config:
         cg.add(var.set_shunt_resistance(0, config[CONF_CONTINUOUS_SHUNT_RESISTANCE]))
 
-    cg.add(var.set_current_interval(config[CONF_VALVE_CURRENT_INTERVAL]))
+    cg.add(var.set_period(config[CONF_PERIOD]))
+    cg.add(var.set_measure_interval(config[CONF_MEASURE_INTERVAL]))

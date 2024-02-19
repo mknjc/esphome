@@ -211,50 +211,7 @@ void ThermComponent::setup() {
            fan_voltage / 1000.0, continuous_voltage / 1000.0);
 }
 
-void ThermComponent::valve_callback() {
-  ESP_LOGV(TAG, "Valve callback, state: %d powered: %d", static_cast<uint8_t>(state_), valve_powered_);
-  if (!valve_powered_) {
-    return;
-  }
-
-  this->valve_output_->digital_write(false);
-  valve_powered_ = false;
-
-  if (this->state_ == State::VALVE_CURRENT_MEASUREMENT_WAIT) {
-    uint16_t mask;
-    if (!this->read_bytes_16(INA3221_REGISTER_MASK_ENABLE, &mask, 1)) {
-      ESP_LOGE(TAG, "Error reading mask");
-      this->mark_failed();
-      return;
-    }
-
-    if ((mask & 0x1) == 0) {
-      ESP_LOGW(TAG, "Valve current measurement not finished");
-    }
-    read_shunt(1);
-    this->state_ = State::VALVE_CURRENT_MEASUREMENT_COMPLETED;
-  }
-}
-
-void ThermComponent::update_fan() { }
-
-void ThermComponent::start_other_measurements() {
-  ESP_LOGV(TAG, "Starting other measurements");
-  this->state_ = State::OTHER_MEASUREMENTS_WAIT;
-
-  auto [config, duration] =
-      calculate_config(MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_16,
-                                            Channel::CHANNEL1_BUS | Channel::CHANNEL2_BUS | Channel::CHANNEL3_BUS |
-                                                Channel::CHANNEL1_SHUNT | Channel::CHANNEL3_SHUNT},
-                       true);
-
-  if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
-    ESP_LOGE(TAG, "Error setting config");
-    this->mark_failed();
-    return;
-  }
-  set_timeout(duration, std::bind(&ThermComponent::measurement_callback, this, 0));
-}
+void ThermComponent::update_fan() {}
 
 void ThermComponent::read_bus_voltage(uint8_t ch) {
   uint16_t bus_voltage;
@@ -284,97 +241,80 @@ void ThermComponent::read_shunt(uint8_t ch) {
   }
 }
 
-void ThermComponent::measurement_callback(uint8_t retry_count) {
-  uint16_t mask;
-  if (!this->read_bytes_16(INA3221_REGISTER_MASK_ENABLE, &mask, 1)) {
-    ESP_LOGE(TAG, "Error reading mask");
-    this->mark_failed();
-    return;
-  }
+void ThermComponent::loop() {
+  auto now = millis();
 
-  if ((mask & 0x1) == 0) {
-    if (retry_count < 10) {
-      ESP_LOGI(TAG, "Measurement not finished");
-      set_timeout(100, std::bind(&ThermComponent::measurement_callback, this, retry_count + 1));
-      return;
-    } else {
-      ESP_LOGE(TAG, "Measurement not finished after 10 retries");
-      this->mark_failed();
-      return;
-    }
-  }
-  ESP_LOGV(TAG, "Measurement finished State: %d", static_cast<uint8_t>(state_));
-  switch (state_) {
-    case State::OTHER_MEASUREMENTS_WAIT:
-      read_bus_voltage(0);
-      read_bus_voltage(1);
-      read_bus_voltage(2);
-      read_shunt(0);
-      read_shunt(2);
-      state_ = State::OTHER_MEASUREMENTS_COMPLETED;
-      break;
-    case State::VALVE_CURRENT_MEASUREMENT_WAIT:  // this should never happen here because its handled in the
-                                                 // valve_callback
-    case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
-    case State::OTHER_MEASUREMENTS_COMPLETED:
-      ESP_LOGE(TAG, "Invalid state %d", static_cast<uint8_t>(state_));
-      break;
-  }
-}
+  if (now - this->state_start_ >= this->state_duration_) {
+    this->state_start_ += this->state_duration_;
 
-void ThermComponent::update() {
-  if (valve_powered_) {  // the timeout didn't trigger yet, we call it to end the cycle
-    cancel_timeout("valve_callback");
-    valve_callback();
-  }
+    switch (this->state_) {
+      case State::WAIT_FOR_PERIOD_START:
+        this->period_start_ = this->state_start_;
 
-  auto cycle_timeout = uint32_t(float(this->update_interval_) * this->valve_value_);
-  auto time_since_last_measurement = millis() - last_valve_measurement_;
-  ESP_LOGV(TAG, "Time since last measurement: %d", time_since_last_measurement);
-  if (time_since_last_measurement > current_interval_) {  // its time for a new measurement
-    ESP_LOGV(TAG, "Starting new measurement cycle");
+        this->valve_measure_counter_++;
+        if (this->valve_measure_counter_ >= this->valve_measure_interval_) {
+          read_bus_voltage(0);
+          read_bus_voltage(1);
+          read_bus_voltage(2);
+          read_shunt(0);
+          read_shunt(2);
 
-    switch (state_) {
-      case State::OTHER_MEASUREMENTS_COMPLETED: {
-        this->valve_output_->digital_write(true);  // do it as fast as possible to help with measurement stabilisation
-        valve_powered_ = true;
-        ESP_LOGV(TAG, "Starting valve current measurement");
-        this->state_ = State::VALVE_CURRENT_MEASUREMENT_WAIT;
+          this->valve_measure_counter_ = 0;
+          this->state_ = State::VALVE_CURRENT_MEASUREMENT_WAIT;
+          this->valve_output_->digital_write(true);  // do it as fast as possible to help with measurement stabilisation
 
+          auto [config, duration] = calculate_config(
+              MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_1, Channel::CHANNEL2_SHUNT}, true);
+
+          if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
+            ESP_LOGE(TAG, "Error setting config");
+            this->mark_failed();
+            return;
+          }
+          this->state_duration_ = duration;
+        } else {
+          float valve_open_time_ = float(this->period_) * this->valve_value_;
+          if (valve_open_time_ > 0) {
+            this->valve_output_->digital_write(true);
+            this->state_ = State::VALVE_CLOSE_WAIT;
+            this->state_duration_ = valve_open_time_;
+          } else {
+            this->state_ = State::WAIT_FOR_PERIOD_START;
+            this->state_duration_ = this->period_;
+          }
+        }
+        break;
+      case State::VALVE_CURRENT_MEASUREMENT_WAIT: {
+        this->read_shunt(1);
         auto [config, duration] = calculate_config(
-            MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_1, Channel::CHANNEL2_SHUNT}, true);
+            MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_4,
+                                 Channel::CHANNEL1_BUS | Channel::CHANNEL2_BUS | Channel::CHANNEL3_BUS |
+                                     Channel::CHANNEL1_SHUNT | Channel::CHANNEL3_SHUNT},
+            true);
 
         if (!this->write_byte_16(INA3221_REGISTER_CONFIG, config)) {
           ESP_LOGE(TAG, "Error setting config");
           this->mark_failed();
           return;
         }
-        cycle_timeout = std::max(cycle_timeout, uint32_t(duration));
-        ESP_LOGV(TAG, "Cycle time is %d ms", cycle_timeout);
-        break;
-      }
-      case State::VALVE_CURRENT_MEASUREMENT_COMPLETED:
-        start_other_measurements();
-        break;
-      case State::VALVE_CURRENT_MEASUREMENT_WAIT:
-      case State::OTHER_MEASUREMENTS_WAIT:  // we are waiting for a measurement to finish
-        ESP_LOGW(TAG, "Waiting for a measurement to finish");
+
+        float valve_open_time_ = (float(this->period_) * this->valve_value_) - this->state_duration_;
+        if (valve_open_time_ > 0) {
+          this->state_ = State::VALVE_CLOSE_WAIT;
+          this->state_duration_ = valve_open_time_;
+        } else {
+          this->valve_output_->digital_write(false);
+          this->state_ = State::WAIT_FOR_PERIOD_START;
+          this->state_duration_ = (this->period_ + this->period_start_) - this->state_start_;
+        }
+      } break;
+      case State::VALVE_CLOSE_WAIT:
+        this->valve_output_->digital_write(false);
+        this->state_ = State::WAIT_FOR_PERIOD_START;
+        this->state_duration_ = (this->period_ + this->period_start_) - this->state_start_;
         break;
     }
-    last_valve_measurement_ = millis();
-  } else {
-    ESP_LOGV(TAG, "Not starting new measurement cycle %d %d %d", millis(), last_valve_measurement_, current_interval_);
   }
-
-  if (cycle_timeout > 0) {
-    if (!valve_powered_) {
-      valve_powered_ = true;
-      this->valve_output_->digital_write(true);
-    }
-    set_timeout("valve_callback", cycle_timeout, std::bind(&ThermComponent::valve_callback, this));
-  }
-
-  update_fan();
 }
 
 void ThermComponent::dump_config() {}
