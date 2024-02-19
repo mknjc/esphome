@@ -49,7 +49,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_CONTINUOUS_SHUNT_RESISTANCE): cv.positive_float,
 
             cv.Optional(CONF_MEASURE_INTERVAL, default=10): cv.positive_not_null_int,
-            cv.Optional(CONF_PERIOD, default="1s"): cv.positive_not_null_time_period,
+            cv.Optional(CONF_PERIOD, default="1s"): cv.positive_time_period_milliseconds,
         }
     )
     .extend(i2c.i2c_device_schema(0x40))
