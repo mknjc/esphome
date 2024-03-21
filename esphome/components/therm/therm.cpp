@@ -287,7 +287,7 @@ void ThermComponent::loop() {
       case State::VALVE_CURRENT_MEASUREMENT_WAIT: {
         this->read_shunt(1);
         auto [config, duration] = calculate_config(
-            MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_4,
+            MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_16,
                                  Channel::CHANNEL1_BUS | Channel::CHANNEL2_BUS | Channel::CHANNEL3_BUS |
                                      Channel::CHANNEL1_SHUNT | Channel::CHANNEL3_SHUNT},
             true);
