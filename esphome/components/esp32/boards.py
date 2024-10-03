@@ -1,4 +1,4 @@
-from .const import VARIANT_ESP32, VARIANT_ESP32S2, VARIANT_ESP32C3, VARIANT_ESP32S3
+from .const import VARIANT_ESP32, VARIANT_ESP32C3, VARIANT_ESP32S2, VARIANT_ESP32S3
 
 ESP32_BASE_PINS = {
     "TX": 1,
@@ -160,6 +160,10 @@ ESP32_BOARD_PINS = {
         "NEOPIXEL_POWER": 8,
         "BUTTON": 0,
         "SWITCH": 0,
+    },
+    "airm2m_core_esp32c3": {
+        "LED1_BUILTIN": 12,
+        "LED2_BUILTIN": 13,
     },
     "alksesp32": {
         "A0": 32,
