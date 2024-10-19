@@ -270,10 +270,10 @@ void ThermComponent::loop() {
               this->valve_position_sensor->publish_state(0.0f);
               break;
             case ValveForce::OPEN:
-              this->valve_position_sensor->publish_state(1.0f);
+              this->valve_position_sensor->publish_state(100.0f);
               break;
             case ValveForce::NONE:
-              this->valve_position_sensor->publish_state(this->valve_value_);
+              this->valve_position_sensor->publish_state(this->valve_value_ * 100.0f);
               break;
           }
         }
