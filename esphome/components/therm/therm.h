@@ -7,6 +7,7 @@
 
 #include "esphome/components/i2c/i2c.h"
 #include "esphome/components/ledc/ledc_output.h"
+#include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 
 namespace esphome {
@@ -72,8 +73,22 @@ enum class State {
   VALVE_CLOSE_WAIT,
 };
 
+enum class ValveForce {
+  NONE,
+  OPEN,
+  CLOSE
+};
+
+class ValveForceSelect : public select::Select, public Parented<ThermComponent> {
+  public:
+    void setup();
+  protected:
+    void control(const std::string &option) override;
+};
+
 class ThermComponent : public i2c::I2CDevice, public Component {
   friend class ThermOutput;
+  friend class ValveForceSelect;
 
  public:
   void setup() override;
@@ -96,6 +111,8 @@ class ThermComponent : public i2c::I2CDevice, public Component {
   }
   void set_current_sensor(uint8_t ch, sensor::Sensor *current_sensor) { this->current_sensor_[ch] = current_sensor; }
   void set_power_sensor(uint8_t ch, sensor::Sensor *power_sensor) { this->power_sensor_[ch] = power_sensor; }
+
+  void set_valve_position_sensor(sensor::Sensor *valve_sensor) { this->valve_position_sensor = valve_sensor; }
 
   void set_period(uint32_t period) { this->period_ = period; }
   void set_measure_interval(uint32_t measure_interval) { this->measure_interval_ = measure_interval; }
@@ -120,6 +137,8 @@ class ThermComponent : public i2c::I2CDevice, public Component {
   void read_bus_voltage(uint8_t ch);
   void read_shunt(uint8_t ch);
 
+  float valve_open_time() const;
+
   GPIOPin *valve_output_;
   ledc::LEDCOutput *fan_output_;
   GPIOPin *r_output_;
@@ -132,6 +151,8 @@ class ThermComponent : public i2c::I2CDevice, public Component {
   sensor::Sensor *current_sensor_[3] = {nullptr, nullptr, nullptr};
   sensor::Sensor *power_sensor_[3] = {nullptr, nullptr, nullptr};
 
+  sensor::Sensor *valve_position_sensor = nullptr;
+
   float valve_value_ = 0.0;
   float fan_value_ = 0.0;
 
@@ -143,6 +164,8 @@ class ThermComponent : public i2c::I2CDevice, public Component {
 
   uint32_t valve_measure_counter_ = 0;
   uint32_t measure_interval_;
+
+  ValveForce valve_force_ = ValveForce::NONE;
 };
 
 }  // namespace therm

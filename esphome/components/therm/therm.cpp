@@ -241,6 +241,19 @@ void ThermComponent::read_shunt(uint8_t ch) {
   }
 }
 
+float ThermComponent::valve_open_time() const {
+  switch (this->valve_force_)
+  {
+  case ValveForce::CLOSE:
+    return 0.0;
+  case ValveForce::OPEN:
+    return this->period_;
+  case ValveForce::NONE:
+    break;
+  }
+  return (float(this->period_) * this->valve_value_);
+}
+
 void ThermComponent::loop() {
   auto now = millis();
 
@@ -250,6 +263,20 @@ void ThermComponent::loop() {
     switch (this->state_) {
       case State::WAIT_FOR_PERIOD_START:
         this->period_start_ = this->state_start_;
+
+        if (this->valve_position_sensor != nullptr) {
+          switch (this->valve_force_) {
+            case ValveForce::CLOSE:
+              this->valve_position_sensor->publish_state(0.0f);
+              break;
+            case ValveForce::OPEN:
+              this->valve_position_sensor->publish_state(1.0f);
+              break;
+            case ValveForce::NONE:
+              this->valve_position_sensor->publish_state(this->valve_value_);
+              break;
+          }
+        }
 
         this->valve_measure_counter_++;
         if (this->valve_measure_counter_ >= this->measure_interval_) {
@@ -273,7 +300,7 @@ void ThermComponent::loop() {
           }
           this->state_duration_ = duration;
         } else {
-          float valve_open_time_ = float(this->period_) * this->valve_value_;
+          float valve_open_time_ = valve_open_time();
           if (valve_open_time_ > 0) {
             this->valve_output_->digital_write(true);
             this->state_ = State::VALVE_CLOSE_WAIT;
@@ -298,7 +325,7 @@ void ThermComponent::loop() {
           return;
         }
 
-        float valve_open_time_ = (float(this->period_) * this->valve_value_) - this->state_duration_;
+        float valve_open_time_ = (valve_open_time()) - this->state_duration_;
         if (valve_open_time_ > 0) {
           this->state_ = State::VALVE_CLOSE_WAIT;
           this->state_duration_ = valve_open_time_;
@@ -331,6 +358,30 @@ void ThermOutput::write_state(float state) {
     this->parent_->set_fan_value(state);
   }
 }
+
+void ValveForceSelect::setup() {
+  this->publish_state("none");
+}
+
+void ValveForceSelect::control(const std::string &value) {
+  if (value == "none") {
+    this->parent_->valve_force_ = ValveForce::NONE;
+    this->publish_state(value);
+    return;
+  } else if (value == "open") {
+    this->parent_->valve_force_ = ValveForce::OPEN;
+    this->publish_state(value);
+    return;
+  } else if (value == "close") {
+    this->parent_->valve_force_ = ValveForce::CLOSE;
+    this->publish_state(value);
+    return;
+  } else {
+    ESP_LOGE(TAG, "Invalid valve force value: %s", value.c_str());
+    return;
+  }
+}
+
 
 }  // namespace therm
 }  // namespace esphome
