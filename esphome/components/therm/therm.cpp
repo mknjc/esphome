@@ -264,22 +264,21 @@ void ThermComponent::loop() {
       case State::WAIT_FOR_PERIOD_START:
         this->period_start_ = this->state_start_;
 
-        if (this->valve_position_sensor != nullptr) {
-          switch (this->valve_force_) {
-            case ValveForce::CLOSE:
-              this->valve_position_sensor->publish_state(0.0f);
-              break;
-            case ValveForce::OPEN:
-              this->valve_position_sensor->publish_state(100.0f);
-              break;
-            case ValveForce::NONE:
-              this->valve_position_sensor->publish_state(this->valve_value_ * 100.0f);
-              break;
-          }
-        }
-
         this->valve_measure_counter_++;
         if (this->valve_measure_counter_ >= this->measure_interval_) {
+          if (this->valve_position_sensor != nullptr) {
+            switch (this->valve_force_) {
+              case ValveForce::CLOSE:
+                this->valve_position_sensor->publish_state(0.0f);
+                break;
+              case ValveForce::OPEN:
+                this->valve_position_sensor->publish_state(100.0f);
+                break;
+              case ValveForce::NONE:
+                this->valve_position_sensor->publish_state(this->valve_value_ * 100.0f);
+                break;
+            }
+          }
           read_bus_voltage(0);
           read_bus_voltage(1);
           read_bus_voltage(2);
