@@ -16,7 +16,7 @@ MULTI_CONF = True
 
 CODEOWNERS = ["@mknjc"]
 DEPENDENCIES = ["i2c"]
-AUTO_LOAD = ["ledc"]
+AUTO_LOAD = ["ledc", "select"]
 
 CONF_THERM_ID = "therm_id"
 
