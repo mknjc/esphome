@@ -288,7 +288,7 @@ void ThermComponent::loop() {
           this->valve_measure_counter_ = 0;
           this->state_ = State::VALVE_CURRENT_MEASUREMENT_WAIT;
           this->valve_output_->digital_write(true);  // do it as fast as possible to help with measurement stabilisation
-
+          ESP_LOGD(TAG, "Valve current measurement start %d", now);
           auto [config, duration] = calculate_config(
               MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_1, Channel::CHANNEL2_SHUNT}, true);
 
@@ -311,6 +311,7 @@ void ThermComponent::loop() {
         }
         break;
       case State::VALVE_CURRENT_MEASUREMENT_WAIT: {
+        ESP_LOGD(TAG, "Valve current measurement finished %d", now);
         this->read_shunt(1);
         auto [config, duration] = calculate_config(
             MeasurementParameter{IntegrationTime::US8244, Averaging::SAMPLE_16,
