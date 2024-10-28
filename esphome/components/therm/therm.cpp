@@ -232,6 +232,10 @@ void ThermComponent::read_shunt(uint8_t ch) {
     return;
   }
   ESP_LOGV(TAG, "Raw Shunt voltage for channel %d: %d", ch, shunt_voltage);
+  if (ch == 1) {
+    ESP_LOGD(TAG, "Raw Shunt voltage for channel %d: %d", ch, shunt_voltage);
+  }
+
   const float shunt_voltage_v = int16_t(shunt_voltage) * 40.0f / 8.0f / 1000000.0f;
   if (this->shunt_voltage_sensor_[ch]) {
     this->shunt_voltage_sensor_[ch]->publish_state(shunt_voltage_v);
