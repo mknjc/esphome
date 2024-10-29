@@ -315,6 +315,17 @@ void ThermComponent::loop() {
         }
         break;
       case State::VALVE_CURRENT_MEASUREMENT_WAIT: {
+        uint16_t mask_reg;
+        if (!this->read_bytes_16(INA3221_REGISTER_MASK_ENABLE, &mask_reg, 1)) {
+          ESP_LOGE(TAG, "Error reading mask register");
+          this->mark_failed();
+          return;
+        }
+        if (!(mask_reg & 0x1)) {
+          ESP_LOGW(TAG, "Valve current measurement did not finished finished");
+          return;
+        }
+
         ESP_LOGD(TAG, "Valve current measurement finished %d", now);
         this->read_shunt(1);
         auto [config, duration] = calculate_config(
