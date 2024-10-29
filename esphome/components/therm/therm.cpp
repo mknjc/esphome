@@ -367,6 +367,12 @@ void ThermOutput::write_state(float state) {
     return;
   }
 
+  if (state > 1.0f || state < 0.0f) {
+    ESP_LOGE(TAG, "Invalid state: %f", state);
+    return;
+  }
+  ESP_LOGD(TAG, "Setting %s state: %f", (this->type_ == OutputType::VALVE ? "valve" : "fan"), state);
+
   if (this->type_ == OutputType::VALVE) {
     this->parent_->set_valve_value(state);
   } else {
