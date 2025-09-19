@@ -91,8 +91,6 @@ class DS248xTemperatureSensor : public sensor::Sensor {
 
   float get_temp_c();
 
-  std::string unique_id() override;
-
  protected:
   DS248xComponent *parent_;
   uint64_t address_;

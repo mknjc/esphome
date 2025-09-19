@@ -541,7 +541,6 @@ float DS248xTemperatureSensor::get_temp_c() {
 
   return temp / 128.0f;
 }
-std::string DS248xTemperatureSensor::unique_id() { return "dallas-" + str_lower_case(format_hex(this->address_)); }
 
 }  // namespace ds248x
 }  // namespace esphome
