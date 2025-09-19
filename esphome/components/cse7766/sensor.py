@@ -1,6 +1,6 @@
 import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome.components import sensor, uart
+import esphome.config_validation as cv
 from esphome.const import (
     CONF_APPARENT_POWER,
     CONF_CURRENT,
@@ -79,7 +79,7 @@ CONFIG_SCHEMA = cv.Schema(
     }
 ).extend(uart.UART_DEVICE_SCHEMA)
 FINAL_VALIDATE_SCHEMA = uart.final_validate_device_schema(
-    "cse7766", baud_rate=4800, require_rx=True
+    "cse7766", baud_rate=4800, parity="EVEN", require_rx=True
 )
 
 
