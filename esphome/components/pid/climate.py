@@ -1,6 +1,6 @@
 from esphome import automation
 import esphome.codegen as cg
-from esphome.components import climate, output, sensor
+from esphome.components import climate, number, output, sensor
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_HUMIDITY_SENSOR,
@@ -12,14 +12,17 @@ from esphome.const import (
     CONF_PRESET,
     CONF_SENSOR,
     CONF_VISUAL,
+    UNIT_CELSIUS,
+    DEVICE_CLASS_TEMPERATURE,
 )
 
 CONF_PRESET_CHANGE = "preset_change"
+CONF_CLIMATE_MODE = "climate_mode"
 CONF_DEFAULT_PRESET = "default_preset"
 
 pid_ns = cg.esphome_ns.namespace("pid")
 PIDClimate = pid_ns.class_("PIDClimate", climate.Climate, cg.Component)
-PIDClimateTargetTempConfig = pid_ns.struct("PIDClimateTargetTempConfig")
+PIDClimatePreset = pid_ns.struct("PIDClimatePreset")
 PIDAutotuneAction = pid_ns.class_("PIDAutotuneAction", automation.Action)
 PIDResetIntegralTermAction = pid_ns.class_(
     "PIDResetIntegralTermAction", automation.Action
@@ -54,13 +57,23 @@ CONF_KP_MULTIPLIER = "kp_multiplier"
 CONF_KI_MULTIPLIER = "ki_multiplier"
 CONF_KD_MULTIPLIER = "kd_multiplier"
 
-PRESET_CONFIG_SCHEMA = cv.Schema(
-    {
-        cv.GenerateID(): cv.declare_id(PIDClimateTargetTempConfig),
-        cv.Required(CONF_NAME): cv.string_strict,
-        cv.Optional(CONF_MODE): climate.validate_climate_mode,
-        cv.Optional(CONF_DEFAULT_TARGET_TEMPERATURE): cv.temperature,
-    }
+AUTO_LOAD = ["climate", "sensor", "output", "number"]
+
+PRESET_CONFIG_SCHEMA = (
+    number.number_schema(
+        PIDClimatePreset,
+        unit_of_measurement=UNIT_CELSIUS,
+        icon="mdi:thermometer",
+        device_class=DEVICE_CLASS_TEMPERATURE,
+        )
+    .extend(
+        {
+            cv.Required(CONF_PRESET): cv.string_strict,
+            cv.Required(CONF_DEFAULT_TARGET_TEMPERATURE): cv.temperature,
+            cv.Optional(CONF_CLIMATE_MODE): climate.validate_climate_mode,
+        }
+    )
+    .extend(cv.COMPONENT_SCHEMA)
 )
 
 def validate_pid_climate(config):
@@ -79,20 +92,12 @@ def validate_pid_climate(config):
 
             if CONF_MAX_TEMPERATURE in visual_config:
                 visual_max_temperature = visual_config[CONF_MAX_TEMPERATURE]
-
         for preset_config in config[CONF_PRESET]:
-            if CONF_DEFAULT_TARGET_TEMPERATURE in preset_config:
-                preset_temperature = preset_config[
-                    CONF_DEFAULT_TARGET_TEMPERATURE
-                ]
-                if preset_temperature < visual_min_temperature:
-                    raise cv.Invalid(
-                        f"{CONF_DEFAULT_TARGET_TEMPERATURE} for {preset_config[CONF_NAME]} is set to {preset_temperature} which is less than the visual minimum temperature of {visual_min_temperature}"
-                    )
-                if preset_temperature > visual_max_temperature:
-                    raise cv.Invalid(
-                        f"{CONF_DEFAULT_TARGET_TEMPERATURE} for {preset_config[CONF_NAME]} is set to {preset_temperature} which is more than the visual maximum temperature of {visual_max_temperature}"
-                    )
+            preset_temp = preset_config[CONF_DEFAULT_TARGET_TEMPERATURE]
+            if not (visual_min_temperature <= preset_temp <= visual_max_temperature):
+                raise cv.Invalid(
+                    f"{CONF_DEFAULT_TARGET_TEMPERATURE} for preset {preset_config[CONF_NAME]} is set to {preset_temp}, which is outside the visual temperature range of {visual_min_temperature} to {visual_max_temperature}"
+                )
 
         # Mode validation
         for preset_config in config[CONF_PRESET]:
@@ -221,26 +226,36 @@ async def to_code(config):
     cg.add(var.set_default_target_temperature(config[CONF_DEFAULT_TARGET_TEMPERATURE]))
 
     if CONF_PRESET in config:
+        visual = config[CONF_VISUAL]
+
         for preset_config in config[CONF_PRESET]:
-            name = preset_config[CONF_NAME]
-            standard_preset = None
+            name = preset_config[CONF_PRESET]
+            preset_target_config = None
             if name.upper() in climate.CLIMATE_PRESETS:
                 standard_preset = climate.CLIMATE_PRESETS[name.upper()]
-            preset_target_config = PIDClimateTargetTempConfig(
-                preset_config[CONF_DEFAULT_TARGET_TEMPERATURE]
-            )
-
-            preset_target_variable = cg.new_variable(
-                preset_config[CONF_ID], preset_target_config
-            )
-
-            if CONF_MODE in preset_config:
-                cg.add(preset_target_variable.set_mode(preset_config[CONF_MODE]))
-
-            if standard_preset is not None:
-                cg.add(var.set_preset_config(standard_preset, preset_target_variable))
+                default_target_temp = preset_config[CONF_DEFAULT_TARGET_TEMPERATURE]
+            
+                preset_target_config = await number.new_number(
+                    preset_config,
+                    standard_preset, default_target_temp,
+                    min_value=visual.get(CONF_MIN_TEMPERATURE, 10.0),
+                    max_value=visual.get(CONF_MAX_TEMPERATURE, 30.0),
+                    step=0.1,
+                )
             else:
-                cg.add(var.set_custom_preset_config(name, preset_target_variable))
+                preset_target_config = await number.new_number(
+                    preset_config,
+                    name, default_target_temp,
+                    min_value=visual.get(CONF_MIN_TEMPERATURE, 10.0),
+                    max_value=visual.get(CONF_MAX_TEMPERATURE, 30.0),
+                    step=0.1,
+                )
+
+            if CONF_CLIMATE_MODE in preset_config:
+                cg.add(preset_target_config.set_climate_mode(preset_config[CONF_CLIMATE_MODE]))
+
+            await cg.register_parented(preset_target_config, var)
+            cg.add(var.add_preset_config(preset_target_config))
 
     if CONF_DEFAULT_PRESET in config:
         default_preset_name = config[CONF_DEFAULT_PRESET]

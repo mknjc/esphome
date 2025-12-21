@@ -1,14 +1,19 @@
 #include "pid_climate.h"
 #include "esphome/core/log.h"
+#include "esphome/components/climate/climate_mode.h"
 
 namespace esphome {
 namespace pid {
 
 static const char *const TAG = "pid.climate";
 
-PIDClimateTargetTempConfig::PIDClimateTargetTempConfig() = default;
-PIDClimateTargetTempConfig::PIDClimateTargetTempConfig(float default_temperature)
-    : default_temperature(default_temperature){};
+void PIDClimatePreset::control(float value) {
+  this->publish_state(value);
+  auto *parent = this->get_parent();
+  if (parent != nullptr) {
+    parent->preset_update_(this);
+  }
+}
 
 PIDClimate::PIDClimate() : preset_change_trigger_(new Trigger<>()) {}
 
@@ -30,6 +35,14 @@ void PIDClimate::setup() {
     this->current_humidity = this->humidity_sensor_->state;
   }
 
+  // restore preset configs
+  this->restore_preset_configs_();
+
+  for (auto &it : this->preset_config_) {
+    if (!it->has_state()) {
+      it->publish_state(it->get_default_target_temperature());
+    }
+  }
   // restore set points
   auto restore = this->restore_state_();
   if (restore.has_value()) {
@@ -47,7 +60,7 @@ void PIDClimate::setup() {
 
     if (this->default_preset_ != climate::ClimatePreset::CLIMATE_PRESET_NONE) {
       this->change_preset_(this->default_preset_);
-    } else if (!this->default_custom_preset_.empty()) {
+    } else if (this->default_custom_preset_ != nullptr) {
       this->change_custom_preset_(this->default_custom_preset_);
     }
   }
@@ -56,8 +69,8 @@ void PIDClimate::control(const climate::ClimateCall &call) {
   if (call.get_preset().has_value()) {
     this->change_preset_(*call.get_preset());
   }
-  if (call.get_custom_preset().has_value()) {
-    this->change_custom_preset_(*call.get_custom_preset());
+  if (call.get_custom_preset() != nullptr) {
+    this->change_custom_preset_(call.get_custom_preset());
   }
 
   if (call.get_mode().has_value())
@@ -86,25 +99,28 @@ climate::ClimateTraits PIDClimate::traits() {
   if (supports_heat_() && supports_cool_())
     traits.add_supported_mode(climate::CLIMATE_MODE_HEAT_COOL);
 
+  std::vector<const char *> custom_presets;
   for (auto &it : this->preset_config_) {
-    traits.add_supported_preset(it.first);
+    if (it->is_custom_preset()) {
+      custom_presets.push_back(it->get_custom_preset());
+    } else {
+      traits.add_supported_preset(it->get_preset());
+    }
   }
-  for (auto &it : this->custom_preset_config_) {
-    traits.add_supported_custom_preset(it.first);
-  }
+  traits.set_supported_custom_presets(custom_presets);
 
-  traits.set_supports_action(true);
+  traits.add_feature_flags(climate::CLIMATE_SUPPORTS_ACTION);
   return traits;
 }
 
-void PIDClimate::dump_preset_config_(const char *preset_name, const PIDClimateTargetTempConfig &config,
+void PIDClimate::dump_preset_config_(const char *preset_name, const PIDClimatePreset *config,
                                      bool is_default_preset) {
   ESP_LOGCONFIG(TAG, "      %s Is Default: %s", preset_name, YESNO(is_default_preset));
-  ESP_LOGCONFIG(TAG, "      %s Default Target Temperature: %.1f°C", preset_name, config.default_temperature);
+  ESP_LOGCONFIG(TAG, "      %s Target Temperature: %.1f°C", preset_name, config->state);
 
-  if (config.mode_.has_value()) {
-    ESP_LOGCONFIG(TAG, "      %s Default Mode: %s", preset_name,
-                  LOG_STR_ARG(climate::climate_mode_to_string(*config.mode_)));
+  if (config->climate_mode_.has_value()) {
+    ESP_LOGCONFIG(TAG, "      %s Mode: %s", preset_name,
+                  LOG_STR_ARG(climate::climate_mode_to_string(*config->climate_mode_)));
   }
 }
 void PIDClimate::dump_config() {
@@ -127,18 +143,25 @@ void PIDClimate::dump_config() {
 
   ESP_LOGCONFIG(TAG, "  Supported PRESETS: ");
   for (auto &it : this->preset_config_) {
-    const auto *preset_name = LOG_STR_ARG(climate::climate_preset_to_string(it.first));
+    if (it->is_custom_preset()) {
+      continue;
+    }
+
+    const auto *preset_name = LOG_STR_ARG(climate::climate_preset_to_string(it->get_preset()));
 
     ESP_LOGCONFIG(TAG, "    Supports %s: %s", preset_name, YESNO(true));
-    this->dump_preset_config_(preset_name, it.second, it.first == this->default_preset_);
+    this->dump_preset_config_(preset_name, it, it->get_preset() == this->default_preset_);
   }
 
   ESP_LOGCONFIG(TAG, "  Supported CUSTOM PRESETS: ");
-  for (auto &it : this->custom_preset_config_) {
-    const auto *preset_name = it.first.c_str();
+  for (auto &it : this->preset_config_) {
+    if (!it->is_custom_preset()) {
+      continue;
+    }
+    const char *preset_name = it->get_custom_preset();
 
     ESP_LOGCONFIG(TAG, "    Supports %s: %s", preset_name, YESNO(true));
-    this->dump_preset_config_(preset_name, it.second, it.first == this->default_custom_preset_);
+    this->dump_preset_config_(preset_name, it, it->get_custom_preset() == this->default_custom_preset_);
   }
 
   if (this->autotuner_ != nullptr) {
@@ -146,12 +169,93 @@ void PIDClimate::dump_config() {
   }
 }
 
+  struct PresetConfigStorage {
+    float target_temperature;
+    union presetId
+    {
+      climate::ClimatePreset preset;
+      uint8_t custom_preset_index;
+    } preset_id;
+    bool is_custom_preset;
+  };
+
+void PIDClimate::restore_preset_configs_() {
+
+  size_t preset_count = this->preset_config_.size();
+  size_t storage_size = sizeof(PresetConfigStorage) * preset_count;
+
+  this->prefstore_ = global_preferences->make_preference(storage_size, this->get_preference_hash());
+  
+  std::vector<PresetConfigStorage> storage(preset_count);
+  bool valid = this->prefstore_.load(storage.data());
+
+  if (valid) {
+    for (size_t i = 0; i < preset_count; i++) {
+      PIDClimatePreset* config = this->preset_config_[i];
+      PresetConfigStorage& stored = storage[i];
+
+      if (stored.target_temperature < 0.0f || stored.target_temperature > 30.0f || stored.target_temperature != stored.target_temperature) {
+        ESP_LOGW(TAG, "Stored preset config at index %d has invalid target temperature %.1f, skipping.", i, stored.target_temperature);
+        continue;
+      }
+
+      if (stored.is_custom_preset) {
+        if (config->is_custom_preset()) {
+          config->publish_state(stored.target_temperature);
+        } else {
+          ESP_LOGW(TAG, "Stored preset config at index %d is custom but preset is not, skipping.", i);
+        }
+      } else {
+        if (!config->is_custom_preset()) {
+          if (config->get_preset() == stored.preset_id.preset) {
+            config->publish_state(stored.target_temperature);
+          } else {
+            ESP_LOGW(TAG, "Stored preset config at index %d does not match preset, skipping.", i);
+          }
+        } else {
+          ESP_LOGW(TAG, "Stored preset config at index %d is not custom but preset is, skipping.", i);
+        }
+      }
+    }
+  } else {
+    ESP_LOGI(TAG, "No stored preset configurations found.");
+  }
+}
+
+void PIDClimate::save_preset_configs_() {
+  size_t preset_count = this->preset_config_.size();
+  size_t storage_size = sizeof(PresetConfigStorage) * preset_count;
+
+  this->prefstore_ = global_preferences->make_preference(storage_size, this->get_preference_hash());
+  
+  std::vector<PresetConfigStorage> storage(preset_count);
+
+  for (size_t i = 0; i < preset_count; i++) {
+    PIDClimatePreset* config = this->preset_config_[i];
+    PresetConfigStorage& stored = storage[i];
+
+    stored.target_temperature = config->state;
+    if (config->is_custom_preset()) {
+      stored.is_custom_preset = true;
+      // We don't store the custom preset string, just the index
+      stored.preset_id.custom_preset_index = static_cast<uint8_t>(i);
+    } else {
+      stored.is_custom_preset = false;
+      stored.preset_id.preset = config->get_preset();
+    }
+  }
+
+  this->prefstore_.save(storage.data());
+}
+
 void PIDClimate::change_preset_(climate::ClimatePreset preset) {
-  auto config = this->preset_config_.find(preset);
+  auto config = std::find_if(
+      this->preset_config_.begin(), this->preset_config_.end(),
+      [preset](PIDClimatePreset* cfg) { return !cfg->is_custom_preset() && cfg->get_preset() == preset; });
 
   if (config != this->preset_config_.end()) {
     ESP_LOGI(TAG, "Preset %s requested", LOG_STR_ARG(climate::climate_preset_to_string(preset)));
-    if (this->change_preset_internal_(config->second) || (!this->preset.has_value()) ||
+    if (this->change_preset_internal_(*config) || (!this->preset.has_value()) ||
         this->preset.value() != preset) {
       // Fire any preset changed trigger if defined
       Trigger<> *trig = this->preset_change_trigger_;
@@ -162,49 +266,53 @@ void PIDClimate::change_preset_(climate::ClimatePreset preset) {
     } else {
       ESP_LOGI(TAG, "No changes required to apply preset %s", LOG_STR_ARG(climate::climate_preset_to_string(preset)));
     }
-    this->custom_preset.reset();
+    this->clear_custom_preset_();
     this->preset = preset;
   } else {
     ESP_LOGE(TAG, "Preset %s is not configured, ignoring.", LOG_STR_ARG(climate::climate_preset_to_string(preset)));
   }
 }
 
-void PIDClimate::change_custom_preset_(const std::string &custom_preset) {
-  auto config = this->custom_preset_config_.find(custom_preset);
+void PIDClimate::change_custom_preset_(const char *custom_preset) {
+  auto config = std::find_if(
+      this->preset_config_.begin(), this->preset_config_.end(),
+      [custom_preset](PIDClimatePreset* cfg) { return cfg->is_custom_preset() && strcmp(cfg->get_custom_preset(), custom_preset) == 0; });
 
-  if (config != this->custom_preset_config_.end()) {
-    ESP_LOGI(TAG, "Custom preset %s requested", custom_preset.c_str());
-    if (this->change_preset_internal_(config->second) || (!this->custom_preset.has_value()) ||
-        this->custom_preset.value() != custom_preset) {
+  if (config != this->preset_config_.end()) {
+    ESP_LOGI(TAG, "Custom preset %s requested", custom_preset);
+    if (this->change_preset_internal_(*config) || (this->has_custom_preset()) ||
+        this->get_custom_preset() != custom_preset) {
       // Fire any preset changed trigger if defined
       Trigger<> *trig = this->preset_change_trigger_;
       assert(trig != nullptr);
       trig->trigger();
 
-      ESP_LOGI(TAG, "Custom preset %s applied", custom_preset.c_str());
+      ESP_LOGI(TAG, "Custom preset %s applied", custom_preset);
     } else {
-      ESP_LOGI(TAG, "No changes required to apply custom preset %s", custom_preset.c_str());
+      ESP_LOGI(TAG, "No changes required to apply custom preset %s", custom_preset);
     }
     this->preset.reset();
-    this->custom_preset = custom_preset;
+    this->set_custom_preset_(custom_preset);
   } else {
-    ESP_LOGE(TAG, "Custom Preset %s is not configured, ignoring.", custom_preset.c_str());
+    ESP_LOGE(TAG, "Custom Preset %s is not configured, ignoring.", custom_preset);
   }
 }
 
-bool PIDClimate::change_preset_internal_(const PIDClimateTargetTempConfig &config) {
+bool PIDClimate::change_preset_internal_(const PIDClimatePreset *config) {
   bool something_changed = false;
 
-  if (this->target_temperature != config.default_temperature) {
-    this->target_temperature = config.default_temperature;
+  float new_target_temperature = config->state;
+
+  if (this->target_temperature != new_target_temperature) {
+    this->target_temperature = new_target_temperature;
     something_changed = true;
   }
 
   // Note: The mode can be defined in the preset but if the climate.control call also specifies them then
   // the climate.control call's values will override the preset's values for that call
-  if (config.mode_.has_value() && (this->mode != config.mode_.value())) {
-    ESP_LOGV(TAG, "Setting mode to %s", LOG_STR_ARG(climate::climate_mode_to_string(*config.mode_)));
-    this->mode = *config.mode_;
+  if (config->climate_mode_.has_value() && (this->mode != config->climate_mode_.value())) {
+    ESP_LOGV(TAG, "Setting mode to %s", LOG_STR_ARG(climate::climate_mode_to_string(*config->climate_mode_)));
+    this->mode = *config->climate_mode_;
     something_changed = true;
   }
 
@@ -304,6 +412,15 @@ void PIDClimate::start_autotune(std::unique_ptr<PIDAutotuner> &&autotune) {
   if (mode != climate::CLIMATE_MODE_HEAT_COOL) {
     ESP_LOGW(TAG, "%s: !!! For PID autotuner you need to set AUTO (also called heat/cool) mode!",
              this->get_name().c_str());
+  }
+}
+
+void PIDClimate::preset_update_(const PIDClimatePreset *config) {
+  // A preset has changed its target temperature, re-apply current preset to update
+  if (this->preset.has_value()) {
+    this->change_preset_(*this->preset);
+  } else if (this->has_custom_preset()) {
+    this->change_custom_preset_(this->get_custom_preset());
   }
 }
 
