@@ -19,7 +19,7 @@ namespace pid {
 
 class PIDClimate;
 
-class PIDClimatePreset : public number::Number, public Parented<PIDClimate> {
+class PIDClimatePreset : public number::Number, public Parented<PIDClimate>, public Component {
  public:
   PIDClimatePreset(climate::ClimatePreset preset, float default_target_temperature) : preset_(preset), default_target_temperature_(default_target_temperature) {};
   PIDClimatePreset(const char *custom_preset, float default_target_temperature) : preset_(custom_preset), default_target_temperature_(default_target_temperature) {};
@@ -41,6 +41,11 @@ class PIDClimatePreset : public number::Number, public Parented<PIDClimate> {
     return this->default_target_temperature_;
   }
 
+  void setup() override;
+  void dump_config() override {};
+
+  bool get_restore_state() const { return this->restore_state_; }
+  void set_restore_state(bool restore_state) { this->restore_state_ = restore_state; }
 
  protected:
   void control(float value) override;
@@ -48,6 +53,8 @@ class PIDClimatePreset : public number::Number, public Parented<PIDClimate> {
 private:
   std::variant<climate::ClimatePreset, const char *> preset_;
   float default_target_temperature_;
+  bool restore_state_{true};
+  ESPPreferenceObject pref_;
 };
 
 
@@ -139,9 +146,6 @@ class PIDClimate : public climate::Climate, public Component {
   climate::ClimateTraits traits() override;
 
   void dump_preset_config_(const char *preset_name, const PIDClimatePreset *config, bool is_default_preset);
-
-  void restore_preset_configs_();
-  void save_preset_configs_();
 
   void update_pid_();
 

@@ -7,12 +7,28 @@ namespace pid {
 
 static const char *const TAG = "pid.climate";
 
+void PIDClimatePreset::setup() {
+  float value = 0.0f;
+  if (this->restore_state_) {
+    this->pref_ = global_preferences->make_preference<float>(this->get_preference_hash());
+    if (!this->pref_.load(&value)) {
+      value = default_target_temperature_;
+    }
+  } else {
+    value = default_target_temperature_;
+  }
+  this->publish_state(value);
+}
+
 void PIDClimatePreset::control(float value) {
   this->publish_state(value);
   auto *parent = this->get_parent();
   if (parent != nullptr) {
     parent->preset_update_(this);
   }
+
+  if (this->restore_state_)
+    this->pref_.save(&value);
 }
 
 PIDClimate::PIDClimate() : preset_change_trigger_(new Trigger<>()) {}
@@ -35,14 +51,6 @@ void PIDClimate::setup() {
     this->current_humidity = this->humidity_sensor_->state;
   }
 
-  // restore preset configs
-  this->restore_preset_configs_();
-
-  for (auto &it : this->preset_config_) {
-    if (!it->has_state()) {
-      it->publish_state(it->get_default_target_temperature());
-    }
-  }
   // restore set points
   auto restore = this->restore_state_();
   if (restore.has_value()) {
@@ -167,85 +175,6 @@ void PIDClimate::dump_config() {
   if (this->autotuner_ != nullptr) {
     this->autotuner_->dump_config();
   }
-}
-
-  struct PresetConfigStorage {
-    float target_temperature;
-    union presetId
-    {
-      climate::ClimatePreset preset;
-      uint8_t custom_preset_index;
-    } preset_id;
-    bool is_custom_preset;
-  };
-
-void PIDClimate::restore_preset_configs_() {
-
-  size_t preset_count = this->preset_config_.size();
-  size_t storage_size = sizeof(PresetConfigStorage) * preset_count;
-
-  this->prefstore_ = global_preferences->make_preference(storage_size, this->get_preference_hash());
-  
-  std::vector<PresetConfigStorage> storage(preset_count);
-  bool valid = this->prefstore_.load(storage.data());
-
-  if (valid) {
-    for (size_t i = 0; i < preset_count; i++) {
-      PIDClimatePreset* config = this->preset_config_[i];
-      PresetConfigStorage& stored = storage[i];
-
-      if (stored.target_temperature < 0.0f || stored.target_temperature > 30.0f || stored.target_temperature != stored.target_temperature) {
-        ESP_LOGW(TAG, "Stored preset config at index %d has invalid target temperature %.1f, skipping.", i, stored.target_temperature);
-        continue;
-      }
-
-      if (stored.is_custom_preset) {
-        if (config->is_custom_preset()) {
-          config->publish_state(stored.target_temperature);
-        } else {
-          ESP_LOGW(TAG, "Stored preset config at index %d is custom but preset is not, skipping.", i);
-        }
-      } else {
-        if (!config->is_custom_preset()) {
-          if (config->get_preset() == stored.preset_id.preset) {
-            config->publish_state(stored.target_temperature);
-          } else {
-            ESP_LOGW(TAG, "Stored preset config at index %d does not match preset, skipping.", i);
-          }
-        } else {
-          ESP_LOGW(TAG, "Stored preset config at index %d is not custom but preset is, skipping.", i);
-        }
-      }
-    }
-  } else {
-    ESP_LOGI(TAG, "No stored preset configurations found.");
-  }
-}
-
-void PIDClimate::save_preset_configs_() {
-  size_t preset_count = this->preset_config_.size();
-  size_t storage_size = sizeof(PresetConfigStorage) * preset_count;
-
-  this->prefstore_ = global_preferences->make_preference(storage_size, this->get_preference_hash());
-  
-  std::vector<PresetConfigStorage> storage(preset_count);
-
-  for (size_t i = 0; i < preset_count; i++) {
-    PIDClimatePreset* config = this->preset_config_[i];
-    PresetConfigStorage& stored = storage[i];
-
-    stored.target_temperature = config->state;
-    if (config->is_custom_preset()) {
-      stored.is_custom_preset = true;
-      // We don't store the custom preset string, just the index
-      stored.preset_id.custom_preset_index = static_cast<uint8_t>(i);
-    } else {
-      stored.is_custom_preset = false;
-      stored.preset_id.preset = config->get_preset();
-    }
-  }
-
-  this->prefstore_.save(storage.data());
 }
 
 void PIDClimate::change_preset_(climate::ClimatePreset preset) {

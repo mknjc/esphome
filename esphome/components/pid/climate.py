@@ -10,10 +10,12 @@ from esphome.const import (
     CONF_MODE,
     CONF_NAME,
     CONF_PRESET,
+    CONF_RESTORE_STATE,
     CONF_SENSOR,
     CONF_VISUAL,
     UNIT_CELSIUS,
     DEVICE_CLASS_TEMPERATURE,
+    ENTITY_CATEGORY_CONFIG,
 )
 
 CONF_PRESET_CHANGE = "preset_change"
@@ -22,7 +24,7 @@ CONF_DEFAULT_PRESET = "default_preset"
 
 pid_ns = cg.esphome_ns.namespace("pid")
 PIDClimate = pid_ns.class_("PIDClimate", climate.Climate, cg.Component)
-PIDClimatePreset = pid_ns.struct("PIDClimatePreset")
+PIDClimatePreset = pid_ns.class_("PIDClimatePreset", number.Number, cg.Component)
 PIDAutotuneAction = pid_ns.class_("PIDAutotuneAction", automation.Action)
 PIDResetIntegralTermAction = pid_ns.class_(
     "PIDResetIntegralTermAction", automation.Action
@@ -65,12 +67,14 @@ PRESET_CONFIG_SCHEMA = (
         unit_of_measurement=UNIT_CELSIUS,
         icon="mdi:thermometer",
         device_class=DEVICE_CLASS_TEMPERATURE,
+        entity_category=ENTITY_CATEGORY_CONFIG
         )
     .extend(
         {
             cv.Required(CONF_PRESET): cv.string_strict,
             cv.Required(CONF_DEFAULT_TARGET_TEMPERATURE): cv.temperature,
             cv.Optional(CONF_CLIMATE_MODE): climate.validate_climate_mode,
+            cv.Optional(CONF_RESTORE_STATE, default=True): cv.boolean,
         }
     )
     .extend(cv.COMPONENT_SCHEMA)
@@ -254,7 +258,10 @@ async def to_code(config):
             if CONF_CLIMATE_MODE in preset_config:
                 cg.add(preset_target_config.set_climate_mode(preset_config[CONF_CLIMATE_MODE]))
 
+            cg.add(preset_target_config.set_restore_state(preset_config[CONF_RESTORE_STATE]))
+
             await cg.register_parented(preset_target_config, var)
+            await cg.register_component(preset_target_config, preset_config)
             cg.add(var.add_preset_config(preset_target_config))
 
     if CONF_DEFAULT_PRESET in config:
