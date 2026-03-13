@@ -77,8 +77,8 @@ void PIDClimate::control(const climate::ClimateCall &call) {
   if (call.get_preset().has_value()) {
     this->change_preset_(*call.get_preset());
   }
-  if (call.get_custom_preset() != nullptr) {
-    this->change_custom_preset_(call.get_custom_preset());
+  if (!call.get_custom_preset().empty()) {
+    this->change_custom_preset_(call.get_custom_preset().c_str());
   }
 
   if (call.get_mode().has_value())
@@ -349,7 +349,7 @@ void PIDClimate::preset_update_(const PIDClimatePreset *config) {
   if (this->preset.has_value()) {
     this->change_preset_(*this->preset);
   } else if (this->has_custom_preset()) {
-    this->change_custom_preset_(this->get_custom_preset());
+    this->change_custom_preset_(this->get_custom_preset().c_str());
   }
 }
 
