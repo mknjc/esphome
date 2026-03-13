@@ -220,7 +220,6 @@ SEND_SCHEMA.add_extra(_validate_send_action)
     "espnow.send",
     SendAction,
     SEND_SCHEMA,
-    synchronous=False,
 )
 @automation.register_action(
     "espnow.broadcast",
@@ -233,7 +232,6 @@ SEND_SCHEMA.add_extra(_validate_send_action)
         ),
         key=CONF_DATA,
     ),
-    synchronous=False,
 )
 async def send_action(
     config: ConfigType,
@@ -273,7 +271,6 @@ async def send_action(
         PEER_SCHEMA,
         key=CONF_ADDRESS,
     ),
-    synchronous=True,
 )
 @automation.register_action(
     "espnow.peer.delete",
@@ -282,7 +279,6 @@ async def send_action(
         PEER_SCHEMA,
         key=CONF_ADDRESS,
     ),
-    synchronous=True,
 )
 async def peer_action(
     config: ConfigType,
@@ -307,7 +303,6 @@ async def peer_action(
         },
         key=CONF_CHANNEL,
     ),
-    synchronous=True,
 )
 async def channel_action(
     config: ConfigType,

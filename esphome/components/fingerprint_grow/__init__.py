@@ -261,7 +261,6 @@ async def to_code(config):
         },
         key=CONF_FINGER_ID,
     ),
-    synchronous=True,
 )
 async def fingerprint_grow_enroll_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -283,7 +282,6 @@ async def fingerprint_grow_enroll_to_code(config, action_id, template_arg, args)
             cv.GenerateID(): cv.use_id(FingerprintGrowComponent),
         }
     ),
-    synchronous=True,
 )
 async def fingerprint_grow_cancel_enroll_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -301,7 +299,6 @@ async def fingerprint_grow_cancel_enroll_to_code(config, action_id, template_arg
         },
         key=CONF_FINGER_ID,
     ),
-    synchronous=True,
 )
 async def fingerprint_grow_delete_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -320,7 +317,6 @@ async def fingerprint_grow_delete_to_code(config, action_id, template_arg, args)
             cv.GenerateID(): cv.use_id(FingerprintGrowComponent),
         }
     ),
-    synchronous=True,
 )
 async def fingerprint_grow_delete_all_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -341,7 +337,6 @@ FINGERPRINT_GROW_LED_CONTROL_ACTION_SCHEMA = cv.maybe_simple_value(
     "fingerprint_grow.led_control",
     LEDControlAction,
     FINGERPRINT_GROW_LED_CONTROL_ACTION_SCHEMA,
-    synchronous=True,
 )
 async def fingerprint_grow_led_control_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -364,7 +359,6 @@ async def fingerprint_grow_led_control_to_code(config, action_id, template_arg, 
             cv.Required(CONF_COUNT): cv.templatable(cv.uint8_t),
         }
     ),
-    synchronous=True,
 )
 async def fingerprint_grow_aura_led_control_to_code(
     config, action_id, template_arg, args

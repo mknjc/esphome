@@ -91,7 +91,6 @@ async def to_code(config):
             cv.GenerateID(): cv.use_id(DFPlayer),
         }
     ),
-    synchronous=True,
 )
 async def dfplayer_next_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -107,7 +106,6 @@ async def dfplayer_next_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DFPlayer),
         }
     ),
-    synchronous=True,
 )
 async def dfplayer_previous_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -125,7 +123,6 @@ async def dfplayer_previous_to_code(config, action_id, template_arg, args):
         },
         key=CONF_FILE,
     ),
-    synchronous=True,
 )
 async def dfplayer_play_mp3_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -146,7 +143,6 @@ async def dfplayer_play_mp3_to_code(config, action_id, template_arg, args):
         },
         key=CONF_FILE,
     ),
-    synchronous=True,
 )
 async def dfplayer_play_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -170,7 +166,6 @@ async def dfplayer_play_to_code(config, action_id, template_arg, args):
             cv.Optional(CONF_LOOP): cv.templatable(cv.boolean),
         }
     ),
-    synchronous=True,
 )
 async def dfplayer_play_folder_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -196,7 +191,6 @@ async def dfplayer_play_folder_to_code(config, action_id, template_arg, args):
         },
         key=CONF_DEVICE,
     ),
-    synchronous=True,
 )
 async def dfplayer_set_device_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -216,7 +210,6 @@ async def dfplayer_set_device_to_code(config, action_id, template_arg, args):
         },
         key=CONF_VOLUME,
     ),
-    synchronous=True,
 )
 async def dfplayer_set_volume_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -234,7 +227,6 @@ async def dfplayer_set_volume_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DFPlayer),
         }
     ),
-    synchronous=True,
 )
 async def dfplayer_volume_up_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -250,7 +242,6 @@ async def dfplayer_volume_up_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DFPlayer),
         }
     ),
-    synchronous=True,
 )
 async def dfplayer_volume_down_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -268,7 +259,6 @@ async def dfplayer_volume_down_to_code(config, action_id, template_arg, args):
         },
         key=CONF_EQ_PRESET,
     ),
-    synchronous=True,
 )
 async def dfplayer_set_eq_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -286,7 +276,6 @@ async def dfplayer_set_eq_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DFPlayer),
         }
     ),
-    synchronous=True,
 )
 async def dfplayer_sleep_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -302,7 +291,6 @@ async def dfplayer_sleep_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DFPlayer),
         }
     ),
-    synchronous=True,
 )
 async def dfplayer_reset_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -318,7 +306,6 @@ async def dfplayer_reset_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DFPlayer),
         }
     ),
-    synchronous=True,
 )
 async def dfplayer_start_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -334,7 +321,6 @@ async def dfplayer_start_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DFPlayer),
         }
     ),
-    synchronous=True,
 )
 async def dfplayer_pause_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -350,7 +336,6 @@ async def dfplayer_pause_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DFPlayer),
         }
     ),
-    synchronous=True,
 )
 async def dfplayer_stop_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -366,7 +351,6 @@ async def dfplayer_stop_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(DFPlayer),
         }
     ),
-    synchronous=True,
 )
 async def dfplayer_random_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)

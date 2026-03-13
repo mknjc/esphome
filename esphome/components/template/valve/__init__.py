@@ -112,7 +112,6 @@ async def to_code(config):
             ),
         }
     ),
-    synchronous=True,
 )
 async def valve_template_publish_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)

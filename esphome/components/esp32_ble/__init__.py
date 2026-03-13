@@ -604,15 +604,11 @@ async def ble_enabled_to_code(config, condition_id, template_arg, args):
     return cg.new_Pvariable(condition_id, template_arg)
 
 
-@automation.register_action(
-    "ble.enable", BLEEnableAction, cv.Schema({}), synchronous=True
-)
+@automation.register_action("ble.enable", BLEEnableAction, cv.Schema({}))
 async def ble_enable_to_code(config, action_id, template_arg, args):
     return cg.new_Pvariable(action_id, template_arg)
 
 
-@automation.register_action(
-    "ble.disable", BLEDisableAction, cv.Schema({}), synchronous=True
-)
+@automation.register_action("ble.disable", BLEDisableAction, cv.Schema({}))
 async def ble_disable_to_code(config, action_id, template_arg, args):
     return cg.new_Pvariable(action_id, template_arg)

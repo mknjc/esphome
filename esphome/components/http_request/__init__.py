@@ -279,22 +279,13 @@ HTTP_REQUEST_SEND_ACTION_SCHEMA = HTTP_REQUEST_ACTION_SCHEMA.extend(
 
 
 @automation.register_action(
-    "http_request.get",
-    HttpRequestSendAction,
-    HTTP_REQUEST_GET_ACTION_SCHEMA,
-    synchronous=True,
+    "http_request.get", HttpRequestSendAction, HTTP_REQUEST_GET_ACTION_SCHEMA
 )
 @automation.register_action(
-    "http_request.post",
-    HttpRequestSendAction,
-    HTTP_REQUEST_POST_ACTION_SCHEMA,
-    synchronous=True,
+    "http_request.post", HttpRequestSendAction, HTTP_REQUEST_POST_ACTION_SCHEMA
 )
 @automation.register_action(
-    "http_request.send",
-    HttpRequestSendAction,
-    HTTP_REQUEST_SEND_ACTION_SCHEMA,
-    synchronous=True,
+    "http_request.send", HttpRequestSendAction, HTTP_REQUEST_SEND_ACTION_SCHEMA
 )
 async def http_request_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])

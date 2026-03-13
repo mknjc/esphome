@@ -55,7 +55,6 @@ LIGHTWAVE_SEND_SCHEMA = cv.Any(
     "lightwaverf.send_raw",
     LightwaveRawAction,
     LIGHTWAVE_SEND_SCHEMA,
-    synchronous=True,
 )
 async def send_raw_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])

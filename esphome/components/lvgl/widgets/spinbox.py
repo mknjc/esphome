@@ -147,7 +147,6 @@ spinbox_spec = SpinboxType()
         },
         key=CONF_ID,
     ),
-    synchronous=True,
 )
 async def spinbox_increment(config, action_id, template_arg, args):
     widgets = await get_widgets(config)
@@ -167,7 +166,6 @@ async def spinbox_increment(config, action_id, template_arg, args):
         },
         key=CONF_ID,
     ),
-    synchronous=True,
 )
 async def spinbox_decrement(config, action_id, template_arg, args):
     widgets = await get_widgets(config)

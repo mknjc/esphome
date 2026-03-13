@@ -652,7 +652,6 @@ async def to_code(config: ConfigType) -> None:
         },
         key=CONF_BRIGHTNESS,
     ),
-    synchronous=True,
 )
 async def hub75_set_brightness_to_code(
     config: ConfigType,

@@ -278,10 +278,7 @@ LIGHT_ADDRESSABLE_SET_ACTION_SCHEMA = cv.Schema(
 
 
 @automation.register_action(
-    "light.addressable_set",
-    AddressableSet,
-    LIGHT_ADDRESSABLE_SET_ACTION_SCHEMA,
-    synchronous=True,
+    "light.addressable_set", AddressableSet, LIGHT_ADDRESSABLE_SET_ACTION_SCHEMA
 )
 async def light_addressable_set_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])

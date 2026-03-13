@@ -422,7 +422,6 @@ CONFIG_SCHEMA = cv.All(
     "sprinkler.set_divider",
     SetDividerAction,
     SPRINKLER_ACTION_SET_DIVIDER_SCHEMA,
-    synchronous=True,
 )
 async def sprinkler_set_divider_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
@@ -436,7 +435,6 @@ async def sprinkler_set_divider_to_code(config, action_id, template_arg, args):
     "sprinkler.set_multiplier",
     SetMultiplierAction,
     SPRINKLER_ACTION_SET_MULTIPLIER_SCHEMA,
-    synchronous=True,
 )
 async def sprinkler_set_multiplier_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
@@ -450,7 +448,6 @@ async def sprinkler_set_multiplier_to_code(config, action_id, template_arg, args
     "sprinkler.queue_valve",
     QueueValveAction,
     SPRINKLER_ACTION_QUEUE_VALVE_SCHEMA,
-    synchronous=True,
 )
 async def sprinkler_set_queued_valve_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
@@ -466,7 +463,6 @@ async def sprinkler_set_queued_valve_to_code(config, action_id, template_arg, ar
     "sprinkler.set_repeat",
     SetRepeatAction,
     SPRINKLER_ACTION_REPEAT_SCHEMA,
-    synchronous=True,
 )
 async def sprinkler_set_repeat_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
@@ -480,7 +476,6 @@ async def sprinkler_set_repeat_to_code(config, action_id, template_arg, args):
     "sprinkler.set_valve_run_duration",
     SetRunDurationAction,
     SPRINKLER_ACTION_SET_RUN_DURATION_SCHEMA,
-    synchronous=True,
 )
 async def sprinkler_set_valve_run_duration_to_code(
     config, action_id, template_arg, args
@@ -495,10 +490,7 @@ async def sprinkler_set_valve_run_duration_to_code(
 
 
 @automation.register_action(
-    "sprinkler.start_from_queue",
-    StartFromQueueAction,
-    SPRINKLER_ACTION_SCHEMA,
-    synchronous=True,
+    "sprinkler.start_from_queue", StartFromQueueAction, SPRINKLER_ACTION_SCHEMA
 )
 async def sprinkler_start_from_queue_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
@@ -506,10 +498,7 @@ async def sprinkler_start_from_queue_to_code(config, action_id, template_arg, ar
 
 
 @automation.register_action(
-    "sprinkler.start_full_cycle",
-    StartFullCycleAction,
-    SPRINKLER_ACTION_SCHEMA,
-    synchronous=True,
+    "sprinkler.start_full_cycle", StartFullCycleAction, SPRINKLER_ACTION_SCHEMA
 )
 async def sprinkler_start_full_cycle_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
@@ -520,7 +509,6 @@ async def sprinkler_start_full_cycle_to_code(config, action_id, template_arg, ar
     "sprinkler.start_single_valve",
     StartSingleValveAction,
     SPRINKLER_ACTION_SINGLE_VALVE_SCHEMA,
-    synchronous=True,
 )
 async def sprinkler_start_single_valve_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
@@ -534,40 +522,21 @@ async def sprinkler_start_single_valve_to_code(config, action_id, template_arg, 
 
 
 @automation.register_action(
-    "sprinkler.clear_queued_valves",
-    ClearQueuedValvesAction,
-    SPRINKLER_ACTION_SCHEMA,
-    synchronous=True,
+    "sprinkler.clear_queued_valves", ClearQueuedValvesAction, SPRINKLER_ACTION_SCHEMA
 )
 @automation.register_action(
-    "sprinkler.next_valve",
-    NextValveAction,
-    SPRINKLER_ACTION_SCHEMA,
-    synchronous=True,
+    "sprinkler.next_valve", NextValveAction, SPRINKLER_ACTION_SCHEMA
 )
 @automation.register_action(
-    "sprinkler.previous_valve",
-    PreviousValveAction,
-    SPRINKLER_ACTION_SCHEMA,
-    synchronous=True,
+    "sprinkler.previous_valve", PreviousValveAction, SPRINKLER_ACTION_SCHEMA
+)
+@automation.register_action("sprinkler.pause", PauseAction, SPRINKLER_ACTION_SCHEMA)
+@automation.register_action("sprinkler.resume", ResumeAction, SPRINKLER_ACTION_SCHEMA)
+@automation.register_action(
+    "sprinkler.resume_or_start_full_cycle", ResumeOrStartAction, SPRINKLER_ACTION_SCHEMA
 )
 @automation.register_action(
-    "sprinkler.pause", PauseAction, SPRINKLER_ACTION_SCHEMA, synchronous=True
-)
-@automation.register_action(
-    "sprinkler.resume", ResumeAction, SPRINKLER_ACTION_SCHEMA, synchronous=True
-)
-@automation.register_action(
-    "sprinkler.resume_or_start_full_cycle",
-    ResumeOrStartAction,
-    SPRINKLER_ACTION_SCHEMA,
-    synchronous=True,
-)
-@automation.register_action(
-    "sprinkler.shutdown",
-    ShutdownAction,
-    SPRINKLER_ACTION_SCHEMA,
-    synchronous=True,
+    "sprinkler.shutdown", ShutdownAction, SPRINKLER_ACTION_SCHEMA
 )
 async def sprinkler_simple_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])

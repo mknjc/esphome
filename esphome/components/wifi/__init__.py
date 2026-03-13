@@ -664,16 +664,12 @@ async def wifi_ap_active_to_code(config, condition_id, template_arg, args):
     return cg.new_Pvariable(condition_id, template_arg)
 
 
-@automation.register_action(
-    "wifi.enable", WiFiEnableAction, cv.Schema({}), synchronous=True
-)
+@automation.register_action("wifi.enable", WiFiEnableAction, cv.Schema({}))
 async def wifi_enable_to_code(config, action_id, template_arg, args):
     return cg.new_Pvariable(action_id, template_arg)
 
 
-@automation.register_action(
-    "wifi.disable", WiFiDisableAction, cv.Schema({}), synchronous=True
-)
+@automation.register_action("wifi.disable", WiFiDisableAction, cv.Schema({}))
 async def wifi_disable_to_code(config, action_id, template_arg, args):
     return cg.new_Pvariable(action_id, template_arg)
 
@@ -779,7 +775,6 @@ async def final_step():
             cv.Optional(CONF_ON_ERROR): automation.validate_automation(single=True),
         }
     ),
-    synchronous=False,
 )
 async def wifi_set_sta_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)

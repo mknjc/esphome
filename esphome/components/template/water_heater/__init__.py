@@ -134,7 +134,6 @@ async def to_code(config: ConfigType) -> None:
             cv.Optional(CONF_IS_ON): cv.templatable(cv.boolean),
         }
     ),
-    synchronous=True,
 )
 async def water_heater_template_publish_to_code(
     config: ConfigType,

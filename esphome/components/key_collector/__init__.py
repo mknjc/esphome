@@ -142,7 +142,6 @@ async def to_code(config):
             cv.GenerateID(): cv.use_id(KeyCollector),
         }
     ),
-    synchronous=True,
 )
 async def enable_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -158,7 +157,6 @@ async def enable_to_code(config, action_id, template_arg, args):
             cv.GenerateID(): cv.use_id(KeyCollector),
         }
     ),
-    synchronous=True,
 )
 async def disable_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)

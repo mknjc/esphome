@@ -297,7 +297,6 @@ meter_spec = MeterType()
             cv.Optional(CONF_OPA): opacity,
         }
     ),
-    synchronous=True,
 )
 async def indicator_update_to_code(config, action_id, template_arg, args):
     widget = await get_widgets(config)

@@ -171,7 +171,6 @@ def validate_raw_data(value):
         },
         key=CONF_DATA,
     ),
-    synchronous=True,
 )
 async def udp_write_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)

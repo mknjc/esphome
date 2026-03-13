@@ -129,7 +129,6 @@ def adjusted_ldo_id(value):
             ),
         }
     ),
-    synchronous=True,
 )
 async def ldo_voltage_adjust_to_code(config, action_id, template_arg, args):
     parent = await cg.get_variable(config[CONF_ID])

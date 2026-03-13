@@ -135,10 +135,7 @@ SIM800L_SEND_SMS_SCHEMA = cv.Schema(
 
 
 @automation.register_action(
-    "sim800l.send_sms",
-    Sim800LSendSmsAction,
-    SIM800L_SEND_SMS_SCHEMA,
-    synchronous=True,
+    "sim800l.send_sms", Sim800LSendSmsAction, SIM800L_SEND_SMS_SCHEMA
 )
 async def sim800l_send_sms_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
@@ -158,9 +155,7 @@ SIM800L_DIAL_SCHEMA = cv.Schema(
 )
 
 
-@automation.register_action(
-    "sim800l.dial", Sim800LDialAction, SIM800L_DIAL_SCHEMA, synchronous=True
-)
+@automation.register_action("sim800l.dial", Sim800LDialAction, SIM800L_DIAL_SCHEMA)
 async def sim800l_dial_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     var = cg.new_Pvariable(action_id, template_arg, paren)
@@ -173,7 +168,6 @@ async def sim800l_dial_to_code(config, action_id, template_arg, args):
     "sim800l.connect",
     Sim800LConnectAction,
     cv.Schema({cv.GenerateID(): cv.use_id(Sim800LComponent)}),
-    synchronous=True,
 )
 async def sim800l_connect_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
@@ -189,10 +183,7 @@ SIM800L_SEND_USSD_SCHEMA = cv.Schema(
 
 
 @automation.register_action(
-    "sim800l.send_ussd",
-    Sim800LSendUssdAction,
-    SIM800L_SEND_USSD_SCHEMA,
-    synchronous=True,
+    "sim800l.send_ussd", Sim800LSendUssdAction, SIM800L_SEND_USSD_SCHEMA
 )
 async def sim800l_send_ussd_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
@@ -206,7 +197,6 @@ async def sim800l_send_ussd_to_code(config, action_id, template_arg, args):
     "sim800l.disconnect",
     Sim800LDisconnectAction,
     cv.Schema({cv.GenerateID(): cv.use_id(Sim800LComponent)}),
-    synchronous=True,
 )
 async def sim800l_disconnect_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])

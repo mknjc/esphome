@@ -73,7 +73,6 @@ BINARY_OUTPUT_ACTION_SCHEMA = maybe_simple_id(
         },
         key=CONF_BRIGHTNESS,
     ),
-    synchronous=True,
 )
 async def tm1651_set_brightness_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -93,7 +92,6 @@ async def tm1651_set_brightness_to_code(config, action_id, template_arg, args):
         },
         key=CONF_LEVEL,
     ),
-    synchronous=True,
 )
 async def tm1651_set_level_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -113,7 +111,6 @@ async def tm1651_set_level_to_code(config, action_id, template_arg, args):
         },
         key=CONF_LEVEL_PERCENT,
     ),
-    synchronous=True,
 )
 async def tm1651_set_level_percent_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -124,10 +121,7 @@ async def tm1651_set_level_percent_to_code(config, action_id, template_arg, args
 
 
 @automation.register_action(
-    "tm1651.turn_off",
-    TurnOffAction,
-    BINARY_OUTPUT_ACTION_SCHEMA,
-    synchronous=True,
+    "tm1651.turn_off", TurnOffAction, BINARY_OUTPUT_ACTION_SCHEMA
 )
 async def output_turn_off_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -135,9 +129,7 @@ async def output_turn_off_to_code(config, action_id, template_arg, args):
     return var
 
 
-@automation.register_action(
-    "tm1651.turn_on", TurnOnAction, BINARY_OUTPUT_ACTION_SCHEMA, synchronous=True
-)
+@automation.register_action("tm1651.turn_on", TurnOnAction, BINARY_OUTPUT_ACTION_SCHEMA)
 async def output_turn_on_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])

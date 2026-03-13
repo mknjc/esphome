@@ -159,7 +159,6 @@ async def register_display(var, config):
             cv.Required(CONF_ID): cv.templatable(cv.use_id(DisplayPage)),
         }
     ),
-    synchronous=True,
 )
 async def display_page_show_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -180,7 +179,6 @@ async def display_page_show_to_code(config, action_id, template_arg, args):
             cv.GenerateID(CONF_ID): cv.templatable(cv.use_id(Display)),
         }
     ),
-    synchronous=True,
 )
 async def display_page_show_next_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
@@ -195,7 +193,6 @@ async def display_page_show_next_to_code(config, action_id, template_arg, args):
             cv.GenerateID(CONF_ID): cv.templatable(cv.use_id(Display)),
         }
     ),
-    synchronous=True,
 )
 async def display_page_show_previous_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
