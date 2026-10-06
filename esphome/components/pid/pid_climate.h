@@ -3,20 +3,69 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/helpers.h"
+#include "esphome/core/preferences.h"
 #include "esphome/components/climate/climate.h"
-#include "esphome/components/sensor/sensor.h"
+#include "esphome/components/number/number.h"
 #include "esphome/components/output/float_output.h"
+#include "esphome/components/sensor/sensor.h"
 #include "pid_controller.h"
 #include "pid_autotuner.h"
 
+#include <map>
+#include <variant>
+
 namespace esphome::pid {
+
+class PIDClimate;
+
+class PIDClimatePreset : public number::Number, public Parented<PIDClimate>, public Component {
+ public:
+  PIDClimatePreset(climate::ClimatePreset preset, float default_target_temperature) : preset_(preset), default_target_temperature_(default_target_temperature) {};
+  PIDClimatePreset(const char *custom_preset, float default_target_temperature) : preset_(custom_preset), default_target_temperature_(default_target_temperature) {};
+
+  void set_climate_mode(climate::ClimateMode climate_mode) { this->climate_mode_ = climate_mode; }
+
+  optional<climate::ClimateMode> climate_mode_{};
+
+  bool is_custom_preset() const {
+    return std::holds_alternative<const char *>(this->preset_);
+  }
+  climate::ClimatePreset get_preset() const {
+    return std::get<climate::ClimatePreset>(this->preset_);
+  }
+  const char *get_custom_preset() const {
+    return std::get<const char *>(this->preset_);
+  }
+  float get_default_target_temperature() const {
+    return this->default_target_temperature_;
+  }
+
+  void setup() override;
+  void dump_config() override {};
+
+  bool get_restore_state() const { return this->restore_state_; }
+  void set_restore_state(bool restore_state) { this->restore_state_ = restore_state; }
+
+ protected:
+  void control(float value) override;
+
+private:
+  std::variant<climate::ClimatePreset, const char *> preset_;
+  float default_target_temperature_;
+  bool restore_state_{true};
+  ESPPreferenceObject pref_;
+};
+
 
 class PIDClimate final : public climate::Climate, public Component {
  public:
-  PIDClimate() = default;
+ friend class PIDClimatePreset;
+  PIDClimate();
   void setup() override;
   void dump_config() override;
 
+  void set_default_preset(const char *custom_preset) { default_custom_preset_ = custom_preset; }
+  void set_default_preset(climate::ClimatePreset preset) { default_preset_ = preset; }
   void set_sensor(sensor::Sensor *sensor) { sensor_ = sensor; }
   void set_humidity_sensor(sensor::Sensor *sensor) { humidity_sensor_ = sensor; }
   void set_cool_output(output::FloatOutput *cool_output) { cool_output_ = cool_output; }
@@ -45,6 +94,10 @@ class PIDClimate final : public climate::Climate, public Component {
   void init_output_buffer(int size) {
     if (size > 1)  // No allocation needed when samples=1 (ring_buffer_average_ short-circuits)
       controller_.output_window_.init(size);
+  }
+
+  void add_preset_config(PIDClimatePreset* config) {
+    preset_config_.push_back(config);
   }
 
   float get_output_value() const { return output_value_; }
@@ -83,11 +136,26 @@ class PIDClimate final : public climate::Climate, public Component {
   void start_autotune(float noiseband, float positive_output, float negative_output);
   void reset_integral_term();
 
+  Trigger<> *get_preset_change_trigger() const { return this->preset_change_trigger_; }
+
  protected:
   /// Override control to change settings of the climate device.
   void control(const climate::ClimateCall &call) override;
+
+  /// Change to a provided preset setting; will reset temperature and mode accordingly
+  void change_preset_(climate::ClimatePreset preset);
+  /// Change to a provided custom preset setting; will reset temperature and mode accordingly
+  void change_custom_preset_(const char *custom_preset);
+
+  /// Applies the temperature and mode of the provided config.
+  /// This is agnostic of custom vs built in preset
+  /// Returns true if something was changed
+  bool change_preset_internal_(const PIDClimatePreset *config);
+
   /// Return the traits of this controller.
   climate::ClimateTraits traits() override;
+
+  void dump_preset_config_(const char *preset_name, const PIDClimatePreset *config, bool is_default_preset);
 
   void update_pid_();
 
@@ -96,6 +164,8 @@ class PIDClimate final : public climate::Climate, public Component {
 
   void write_output_(float value);
 
+  void preset_update_(const PIDClimatePreset* preset);
+  
   /// The sensor used for getting the current temperature
   sensor::Sensor *sensor_;
   /// The sensor used for getting the current humidity
@@ -109,6 +179,17 @@ class PIDClimate final : public climate::Climate, public Component {
   float default_target_temperature_;
   std::unique_ptr<PIDAutotuner> autotuner_;
   bool do_publish_ = false;
+
+  /// The triggr to call when the preset mode changes
+  Trigger<> *preset_change_trigger_{nullptr};
+
+  /// Default standard preset to use on start up
+  climate::ClimatePreset default_preset_{};
+  /// Default custom preset to use on start up
+  const char * default_custom_preset_{};
+
+  std::vector<PIDClimatePreset*> preset_config_;
+  ESPPreferenceObject prefstore_;
 };
 
 }  // namespace esphome::pid
